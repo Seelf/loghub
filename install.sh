@@ -249,14 +249,25 @@ EOF
 EOF
 }
 
+# Pliki z konkretnego commita (adres z sha nie jest trzymany w cache GitHuba jak .../main/...),
+# zeby aktualizacja zaraz po pushu nie pobrala starej wersji.
+raw_base() {
+  local sha=""
+  if [ -z "${LOGHUB_REPO_RAW:-}" ]; then
+    sha="$(curl -fsSL -m 10 "https://api.github.com/repos/$REPO/commits/main" 2>/dev/null | sed -n 's/^  "sha": "\([0-9a-f]\{40\}\)".*/\1/p' | head -1 || true)"
+  fi
+  if [ -n "$sha" ]; then echo "https://raw.githubusercontent.com/$REPO/$sha"; else echo "$REPO_RAW"; fi
+}
+
 fetch_hub_files() {
-  local src="${BASH_SOURCE[0]:-}" dir="" f
+  local src="${BASH_SOURCE[0]:-}" dir="" f raw=""
   [ -n "$src" ] && [ -f "$src" ] && dir="$(dirname "$(readlink -f "$src")")/hub"
   for f in www/index.html www/demo.js auth/auth.py notify/notify.py status/index.html; do
     if [ -n "$dir" ] && [ -f "$dir/$f" ]; then
       install -m 644 "$dir/$f" "$HUB_DIR/$f"
     else
-      curl -fsSL "$REPO_RAW/hub/$f" -o "$HUB_DIR/$f"
+      if [ -z "$raw" ]; then raw="$(raw_base)"; say "Pobieram pliki centrali: ${raw##*/}"; fi
+      curl -fsSL "$raw/hub/$f" -o "$HUB_DIR/$f.new" && mv -f "$HUB_DIR/$f.new" "$HUB_DIR/$f"
     fi
   done
 }

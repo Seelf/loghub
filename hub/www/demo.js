@@ -251,7 +251,7 @@
     return out;
   }
   let user = { user: 'admin', role: 'admin', hosts: null };
-  const ACCOUNTS = { admin: { user: 'admin', role: 'admin', hosts: null, totp: true }, ola: { user: 'ola', role: 'viewer', hosts: ['media', 'pve'], totp: true }, kamil: { user: 'kamil', role: 'viewer', hosts: ['vps'], totp: false } };
+  const ACCOUNTS = { admin: { user: 'admin', role: 'admin', hosts: null, totp: true }, ola: { user: 'ola', role: 'viewer', hosts: ['media', 'pve'], totp: true }, kamil: { user: 'kamil', role: 'viewer', hosts: [], units: [['vps', 'file', 'teamspeak']], totp: false } };
   let NCFG = { rules: { host_offline: { on: true, minutes: 3 }, service_down: { on: true }, cron_failed: { on: true }, disk: { on: true, pct: 90 },
     cpu: { on: true, pct: 90, minutes: 10 }, mem: { on: true, pct: 90, minutes: 10 }, errors: { on: false, count: 50, minutes: 5 }, disk_health: { on: true }, ports: { on: true } },
     notify_resolved: true, repeat_hours: 0, channels: [{ id: 'demo1', type: 'ntfy', on: true, name: 'telefon', url: 'https://ntfy.sh/moj-loghub', token: '' }] };
@@ -309,13 +309,15 @@
       if (!path && method === 'POST') {
         if (!/^[a-z0-9_-]{2,32}$/.test(body.user || '')) throw new Error('nazwa: 2-32 znaki z zestawu a-z 0-9 _ -');
         if (ACCOUNTS[body.user]) throw new Error('taki użytkownik już istnieje');
-        ACCOUNTS[body.user] = { user: body.user, role: body.role, hosts: body.role === 'admin' || body.hosts === 'all' ? null : body.hosts, totp: false };
+        const all = body.role === 'admin' || body.hosts === 'all';
+        ACCOUNTS[body.user] = { user: body.user, role: body.role, hosts: all ? null : body.hosts, units: all ? [] : (body.units || []), totp: false };
         return Object.assign({ password: 'a1b2c3-d4e5f6-0789ab' }, ACCOUNTS[body.user]);
       }
       const u = ACCOUNTS[path]; if (!u) throw new Error('nie ma takiego użytkownika');
       if (method === 'DELETE') { if (path === user.user) throw new Error('nie można usunąć własnego konta'); delete ACCOUNTS[path]; return { ok: true }; }
       if ('role' in body) u.role = body.role;
       if ('hosts' in body) u.hosts = u.role === 'admin' || body.hosts === 'all' ? null : body.hosts;
+      if ('units' in body) u.units = u.hosts == null ? [] : body.units;
       if (body.reset_2fa) u.totp = false;
       return Object.assign({}, u, body.new_password ? { password: 'f0e1d2-c3b4a5-968778' } : {});
     },

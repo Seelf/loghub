@@ -133,6 +133,14 @@ Strona nie pokazuje surowej liczby linii z błędami, tylko zdarzenia. Zdarzenie
 Zakładka Przegląd → Zdarzenia pokazuje pasek godzin albo dni (24 h, 7, 30, 90 dni); klik w dzień zawęża listę, a „Logi” otwiera błędy z okna danego zdarzenia.
 Źródła z błędami w co najmniej połowie godzin trafiają do sekcji „Stały szum” i można je wyciszyć (zapamiętuje to przeglądarka).
 
+## Konta i widoczność logów
+
+Panel → Użytkownicy (tylko administrator): „+ Nowe konto” albo „Edytuj” otwiera edytor. Oglądający może widzieć wszystko albo tylko wybrane rzeczy:
+- całą maszynę: jej logi, stan, zasoby i źródła dodane później,
+- pojedyncze źródło logów: po rozwinięciu maszyny zaznaczasz np. tylko `teamspeak` z VPS; takie konto widzi wyłącznie logi tego źródła, bez stanu maszyny i powiadomień.
+
+Ograniczenie wymusza usługa logowania: do każdego zapytania konta dokleja filtr (`extra_filters` VictoriaLogs), którego nie da się obejść treścią zapytania.
+
 ## Dodawanie maszyn z panelu
 
 Panel → Dodaj maszynę (tylko administrator) pokazuje gotowe komendy z adresem centrali i tokenem: dla serwera w domowej sieci, VPS przez Tailscale, hosta Proxmoxa (host, LXC i VM naraz), kroki dla Home Assistant OS i komendę usunięcia agenta. Pole „Nazwa maszyny” dopisuje `--name` do komend.

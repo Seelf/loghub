@@ -104,8 +104,40 @@ def clean_hosts(v):
     return out
 
 
+def user_units(u):
+    """Pojedyncze zrodla logow [maszyna, rodzaj, zrodlo] widoczne poza calymi maszynami (np. tylko TeamSpeak z VPS)."""
+    if u.get("role") == "admin" or user_hosts(u) is None:
+        return []
+    return [x for x in u.get("units") or [] if isinstance(x, list) and len(x) == 3]
+
+
+def clean_units(v):
+    out = set()
+    for x in v or []:
+        if not isinstance(x, (list, tuple)) or len(x) != 3:
+            raise ValueError("zły format źródła")
+        h, src, unit = (str(y).strip() for y in x)
+        if not HOST_RE.match(h):
+            raise ValueError("niedozwolona nazwa maszyny: %s" % h)
+        for y in (src, unit):
+            if not y or len(y) > 200 or any(ord(ch) < 32 for ch in y):
+                raise ValueError("niedozwolona nazwa źródła: %r" % y)
+        out.add((h, src, unit))
+    if len(out) > 500:
+        raise ValueError("za dużo wybranych źródeł")
+    return [list(x) for x in sorted(out)]
+
+
+def scope_filter(hosts, units):
+    """Filtr LogsQL doklejany do kazdego zapytania konta z ograniczonym dostepem: cale maszyny albo pojedyncze strumienie."""
+    q = lambda x: json.dumps(x, ensure_ascii=False)
+    parts = ["{host=%s}" % q(h) for h in hosts]
+    parts += ["{host=%s,source=%s,unit=%s}" % (q(h), q(src), q(unit)) for h, src, unit in units if h not in hosts]
+    return "(" + " or ".join(parts or ['{host="-brak-dostepu-"}']) + ")"
+
+
 def user_info(name, u):
-    return {"user": name, "role": u.get("role", "viewer"), "hosts": user_hosts(u), "totp": bool(u.get("totp"))}  # dla nieistniejacych kont, zeby czas odpowiedzi byl ten sam
+    return {"user": name, "role": u.get("role", "viewer"), "hosts": user_hosts(u), "units": user_units(u), "totp": bool(u.get("totp"))}  # dla nieistniejacych kont, zeby czas odpowiedzi byl ten sam
 
 # ----------------------------------------------------------------------- TOTP
 
@@ -278,7 +310,7 @@ class Handler(BaseHTTPRequestHandler):
                 users = load()
                 name = read_session(v, users)
                 if name:
-                    return name, users[name].get("role", "viewer"), user_hosts(users[name])
+                    return name, users[name].get("role", "viewer"), user_hosts(users[name]), user_units(users[name])
         return None
 
     def json_body(self, limit=4096):
@@ -313,8 +345,8 @@ class Handler(BaseHTTPRequestHandler):
                 return self.send(403, {"error": "brak dostępu do tego widoku"})
             form = parse_qsl(parts.query, keep_blank_values=True) + parse_qsl(raw.decode("utf-8", "replace"), keep_blank_values=True)
             form = [(k, v) for k, v in form if k not in ("extra_filters", "extra_stream_filters")]
-            # postac JSON z dokumentacji VictoriaLogs: {"host": [..]} oznacza {host in (..)}
-            form.append(("extra_stream_filters", json.dumps({"host": hosts or ["-brak-dostepu-"]})))
+            # extra_filters przyjmuje dowolny filtr LogsQL; baza laczy go z zapytaniem przez AND
+            form.append(("extra_filters", scope_filter(hosts, who[3])))
             method, url, body = "POST", parts.path, urlencode(form).encode()
             headers["Content-Type"] = "application/x-www-form-urlencoded"
         conn = http.client.HTTPConnection(VL.hostname, VL.port or 80, timeout=3600)
@@ -375,6 +407,9 @@ class Handler(BaseHTTPRequestHandler):
                     h = clean_hosts(body.get("hosts"))
                     if h is not None:
                         s.users[name]["hosts"] = h
+                        un = clean_units(body.get("units"))
+                        if un:
+                            s.users[name]["units"] = un
                     out = dict(user_info(name, s.users[name]), password=pw)
                     self.say("user-add %s by" % name, who[0])
                     return self.send(200, out)
@@ -402,8 +437,15 @@ class Handler(BaseHTTPRequestHandler):
                         h = clean_hosts(body.get("hosts"))
                         if h is None:
                             u.pop("hosts", None)
+                            u.pop("units", None)
                         else:
                             u["hosts"] = h
+                    if "units" in body:
+                        un = clean_units(body.get("units"))
+                        if un and u.get("hosts") is not None:
+                            u["units"] = un
+                        else:
+                            u.pop("units", None)
                     if body.get("new_password"):
                         out["password"] = new_password()
                         u["pw"] = hash_pw(out["password"])
@@ -425,7 +467,7 @@ class Handler(BaseHTTPRequestHandler):
             who = self.current()
             if who:
                 hs = "*" if who[2] is None else ",".join(who[2])
-                return self.send(200, {"user": who[0], "role": who[1], "hosts": who[2]}, [("X-User", who[0]), ("X-Role", who[1]), ("X-Hosts", hs or "-")])
+                return self.send(200, {"user": who[0], "role": who[1], "hosts": who[2], "units": who[3]}, [("X-User", who[0]), ("X-Role", who[1]), ("X-Hosts", hs or "-")])
             return self.send(401, {"error": "auth"})
         self.send(404, {"error": "not found"})
 
@@ -481,8 +523,10 @@ def cli(args):
     if action == "list":
         for n, u in sorted(load().items()):
             h = user_hosts(u)
-            print("%-20s %-7s 2FA: %-4s maszyny: %s" % (n, u.get("role", "viewer"), "tak" if u.get("totp") else "nie",
-                                                        "wszystkie" if h is None else (", ".join(h) or "zadna")))
+            un = user_units(u)
+            print("%-20s %-7s 2FA: %-4s maszyny: %s%s" % (n, u.get("role", "viewer"), "tak" if u.get("totp") else "nie",
+                                                          "wszystkie" if h is None else (", ".join(h) or "zadna"),
+                                                          ("; zrodla: " + ", ".join("%s/%s" % (x[0], x[2]) for x in un)) if un else ""))
         return
     if not NAME_RE.match(name):
         sys.exit("nazwa: 2-32 znaki z zestawu a-z 0-9 _ -")
