@@ -256,6 +256,10 @@
     cpu: { on: true, pct: 90, minutes: 10 }, mem: { on: true, pct: 90, minutes: 10 }, errors: { on: false, count: 50, minutes: 5 }, disk_health: { on: true }, ports: { on: true } },
     notify_resolved: true, repeat_hours: 0, channels: [{ id: 'demo1', type: 'ntfy', on: true, name: 'telefon', url: 'https://ntfy.sh/moj-loghub', token: '' }] };
 
+  let SCFG = { title: 'Status usług', components: [
+    { id: 'ts', name: 'TeamSpeak', group: 'Rozmowy', type: 'unit', host: 'vps', target: 'teamspeak.service' },
+    { id: 'jf', name: 'Jellyfin', group: 'Multimedia', type: 'docker', host: 'media', target: 'jellyfin' },
+    { id: 'ha', name: 'Serwer domowy', group: '', type: 'host', host: 'pve', target: '' }] };
   window.loghubDemo = {
     async api(path, body, signal) {
       const q = String(body.get('query') || '');
@@ -333,6 +337,12 @@
           { kind: 'cpu', host: 'media', unit: '', title: 'media: CPU 94% (średnio 10 min)', detail: 'Próg: 90%.', sev: 'warn', since: now - 260 * m, until: now - 228 * m },
           { kind: 'service_down', host: 'pve', unit: 'pveproxy.service', title: 'pve: usługa pveproxy.service padła', detail: 'systemd: failed', sev: 'error', since: now - 1500 * m, until: now - 1496 * m }],
       };
+      if (path === 'status' && method === 'PUT') {
+        if ((body.components || []).some(c => !c.name)) throw new Error('każda usługa musi mieć nazwę widoczną na stronie');
+        SCFG = { title: body.title || 'Status usług', components: body.components.map((c, i) => Object.assign({ id: c.id || 'd' + Date.now() + i }, c)) };
+        return Object.assign({ states: {} }, JSON.parse(JSON.stringify(SCFG)));
+      }
+      if (path === 'status') return Object.assign({ states: { ts: 'ok', jf: 'ok', ha: 'partial' } }, JSON.parse(JSON.stringify(SCFG)));
       if (path === 'config' && method === 'PUT') { NCFG = JSON.parse(JSON.stringify(body)); return JSON.parse(JSON.stringify(NCFG)); }
       if (path === 'config') return JSON.parse(JSON.stringify(NCFG));
       if (path === 'test') return { results: NCFG.channels.filter(c => c.on !== false).map(c => ({ channel: c.name || c.type, ok: true })) };

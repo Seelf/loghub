@@ -125,6 +125,12 @@ Strona nie pokazuje surowej liczby linii z błędami, tylko zdarzenia. Zdarzenie
 Zakładka Przegląd → Zdarzenia pokazuje pasek godzin albo dni (24 h, 7, 30, 90 dni); klik w dzień zawęża listę, a „Logi” otwiera błędy z okna danego zdarzenia.
 Źródła z błędami w co najmniej połowie godzin trafiają do sekcji „Stały szum” i można je wyciszyć (zapamiętuje to przeglądarka).
 
+## Publiczna strona statusu
+
+Panel → Strona statusu (tylko administrator): dodajesz usługi pod własnymi nazwami (np. „TeamSpeak”) i podpinasz każdą pod kontener Dockera, usługę systemd albo cały serwer. Centrala co minutę zapisuje ich stan i buduje plik `status.json` z paskami dostępności z 90 dni. W pliku nie ma nazw maszyn, adresów ani logów.
+
+Strona jest wystawiona na porcie `8082` tylko na samej centrali (`127.0.0.1`). Na zewnątrz wystawiasz ją tunelem Cloudflare: Public Hostname, np. `status.twojadomena.pl`, typ HTTP, URL `localhost:8082`. Pod tym portem Caddy serwuje wyłącznie `index.html` i `status.json`; nie ma tam połączenia z bazą, logowaniem ani powiadomieniami. Podgląd dla zalogowanych: `/status/` w panelu.
+
 ## Powiadomienia
 
 Usługa `notify` na centrali co minutę sprawdza: brak kontaktu z maszyną, padnięte kontenery i usługi, błędy

@@ -162,9 +162,14 @@ main{flex:1;min-width:0;display:flex;flex-direction:column}
 .acts{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
 .acts .pri{background:var(--acc);border-color:var(--acc);color:var(--bg);font-weight:600}
 #nmsg{font-size:12px}
-#usersv{flex:1;overflow:auto;padding:18px 22px 28px;display:flex;flex-direction:column;gap:14px}
-#usersv>*{flex:none}
-#usersv>header{display:flex;align-items:flex-start;gap:10px}
+#usersv,#statv{flex:1;overflow:auto;padding:18px 22px 28px;display:flex;flex-direction:column;gap:14px}
+#usersv>*,#statv>*{flex:none}
+#usersv>header,#statv>header{display:flex;align-items:flex-start;gap:10px}
+.srow{display:grid;grid-template-columns:minmax(130px,1.4fr) minmax(90px,1fr) 140px 120px minmax(130px,1.4fr) 92px repeat(3,32px);gap:6px;align-items:center}
+.srow button{padding:5px 0}
+.srow .chip{justify-content:center}
+#statv code{font-family:var(--mono);font-size:12px;background:var(--panel);padding:1px 5px;border-radius:4px}
+@media(max-width:900px){.srow{grid-template-columns:1fr 1fr;padding-bottom:10px;border-bottom:1px solid var(--line)}}
 #utbl{border:1px solid var(--line);border-radius:12px;background:var(--card);overflow-x:auto}
 #utbl .tr{grid-template-columns:minmax(120px,1fr) 110px minmax(200px,2fr) 90px minmax(280px,auto);min-width:860px;cursor:default}
 .hp{display:flex;flex-direction:column;gap:3px;max-height:260px;overflow:auto;border:1px solid var(--line);border-radius:8px;padding:8px}
@@ -276,6 +281,7 @@ mark{background:var(--hl);color:inherit;border-radius:2px}
     <button data-go="err">Błędy i ostrzeżenia<small class="chip bad" id="nerr" hidden></small></button>
     <button data-go="cron">Zadania cron<small class="chip bad" id="ncron" hidden></small></button>
     <button data-go="notif">Powiadomienia<small class="chip bad" id="nnot" hidden></small></button>
+    <button data-go="status" id="navstat" hidden>Strona statusu</button>
     <button data-go="users" id="navusers" hidden>Użytkownicy</button>
   </div>
   <div class="lbl">Serwery</div>
@@ -370,6 +376,20 @@ mark{background:var(--hl);color:inherit;border-radius:2px}
     <div id="nhist" class="nlist"></div>
   </section>
 
+  <section id="statv" hidden>
+    <header><button class="tog" data-tog title="Pokaż lub ukryj panel">☰</button><div><h1>Strona statusu</h1><div class="mut">Publiczna strona ze stanem wybranych usług i paskami dostępności z 90 dni. Nie pokazuje nazw maszyn, adresów ani logów: tylko nazwy, które tu wpiszesz.</div></div></header>
+    <div class="panel">
+      <h2>Usługi na stronie</h2>
+      <label class="mut" style="display:flex;flex-direction:column;gap:4px;max-width:420px">Tytuł strony<input id="stitle" maxlength="80" placeholder="Status usług"></label>
+      <div id="scomps" style="display:flex;flex-direction:column;gap:8px"></div>
+      <div class="acts"><button id="sadd">+ dodaj usługę</button></div>
+    </div>
+    <div class="acts"><button class="pri" id="ssave">Zapisz</button><a id="sprev" href="/status/" target="_blank" rel="noopener">otwórz podgląd strony</a><span id="smsg" role="status"></span></div>
+    <div class="panel">
+      <h2>Własna domena (np. status.konarczak.pl)</h2>
+      <div class="mut">Centrala wystawia stronę statusu na porcie <code>8082</code>, dostępnym tylko z samej centrali. W tunelu Cloudflare (Zero Trust → Networks → Tunnels → Twój tunel → Public Hostname) dodaj adres, np. <code>status</code> + Twoja domena, typ <code>HTTP</code>, URL <code>localhost:8082</code>. Pod tym portem są tylko dwa pliki: strona i <code>status.json</code>. Nie ma tam logowania, logów ani żadnego połączenia z bazą, więc nie potrzeba Cloudflare Access.</div>
+    </div>
+  </section>
   <section id="usersv" hidden>
     <header><button class="tog" data-tog title="Pokaż lub ukryj panel">☰</button><div><h1>Użytkownicy</h1><div class="mut">Każde konto loguje się hasłem i kodem 2FA (włączanym przy pierwszym logowaniu). Oglądający widzi tylko maszyny, które mu zaznaczysz.</div></div></header>
     <div class="panel">
@@ -446,7 +466,7 @@ async function api(path,params,signal){
   const body=new URLSearchParams(params);
   const r=demo()?await demo().api(path,body,signal):await fetch('/select/logsql/'+path,{method:'POST',body,signal});
   if(r.status===401){showLogin('Sesja wygasła. Zaloguj się ponownie.');throw new Error('sesja wygasła')}
-  if(!r.ok)throw new Error(r.status+' '+(await r.text()).slice(0,200));
+  if(!r.ok){const t=await r.text();throw new Error(r.status+(/^\s*</.test(t)?' (centrala albo tunel nie odpowiada)':' '+t.slice(0,200)))}
   return r;
 }
 async function auth(path,body){
@@ -464,9 +484,11 @@ function showLogin(msg){
 function enter(u){
   me=u;$('#login').hidden=true;$('#app').hidden=false;
   $('#who').textContent=u.user;$('#role').textContent=u.role==='admin'?'administrator':(u.hosts?'oglądający: '+(u.hosts.length?u.hosts.length+' masz.':'brak'):'oglądający');
-  $('#navusers').hidden=u.role!=='admin';$('#adv').hidden=!!u.hosts||!!demo();if(view==='users'&&u.role!=='admin')view='over';
+  $('#navusers').hidden=u.role!=='admin';$('#navstat').hidden=u.role!=='admin';if(view==='status'&&u.role!=='admin')view='over';$('#adv').hidden=!!u.hosts||!!demo();if(view==='users'&&u.role!=='admin')view='over';
   if(demo()){$('#demo').hidden=false;$('#adv').hidden=true}
-  if(!started){started=true;setInterval(refresh,6e4);setInterval(()=>{if(me&&view==='logs')headStats()},3e4);setInterval(pollStat,15e3);setInterval(loadNotif,3e4)}
+  if(!started){started=true;setInterval(refresh,6e4);setInterval(()=>{if(me&&view==='logs')headStats()},3e4);setInterval(pollStat,15e3);setInterval(loadNotif,3e4);
+    // gdy strumien milczy (np. tunel go wstrzymal), co 20 s dociagamy nowe linie zwyklym zapytaniem
+    setInterval(()=>{if(me&&view==='logs'&&live&&cur&&cur.q&&!cur.win&&ctl&&!document.hidden&&Date.now()-lastData>25e3)catchUp(cur.q,ctl.signal)},2e4)}
   show(view);refresh();loadNotif();
 }
 $('#lf').onsubmit=async e=>{
@@ -799,7 +821,7 @@ function marks(){
   const k=view==='cron'&&cronHost?'':view!=='logs'?view:cur&&cur.sel===ALL?($('#lvl').value?'err':'all'):'';
   for(const b of document.querySelectorAll('#nav button'))b.classList.toggle('on',b.dataset.go===k);
 }
-function show(v){view=v;$('#over').hidden=v!=='over';$('#logs').hidden=v!=='logs';$('#cronv').hidden=v!=='cron';$('#notv').hidden=v!=='notif';$('#usersv').hidden=v!=='users';marks();if(v==='notif')loadNotif(true);if(v==='users')loadUsers()}
+function show(v){view=v;$('#over').hidden=v!=='over';$('#logs').hidden=v!=='logs';$('#cronv').hidden=v!=='cron';$('#notv').hidden=v!=='notif';$('#usersv').hidden=v!=='users';$('#statv').hidden=v!=='status';marks();if(v==='notif')loadNotif(true);if(v==='users')loadUsers();if(v==='status')loadStat()}
 
 // -------------------------------------------------------------------- przeglad
 function renderOver(light){
@@ -1243,6 +1265,52 @@ $('#ntest').onclick=async()=>{
   catch(e){m.style.color='var(--err)';m.textContent='Nie wysłano: '+e.message}
 };
 
+// ------------------------------------------------------------- strona statusu
+let SC={title:'',components:[],states:{}};
+async function loadStat(){
+  $('#sprev').hidden=!!demo();
+  try{SC=await napi('status');SC.components=SC.components||[];renderStat()}catch(e){$('#smsg').textContent=e.message}
+}
+function renderStat(){
+  $('#stitle').value=SC.title||'';
+  const box=$('#scomps');box.textContent='';
+  if(!SC.components.length)box.append(el('div','mut','Nie ma jeszcze żadnych usług. Dodaj pierwszą, np. „TeamSpeak” podpięty pod usługę teamspeak.service na VPS.'));
+  SC.components.forEach((c,i)=>box.append(statRow(c,i)));
+}
+function statRow(c,i){
+  const r=el('div','srow');
+  const nm=el('input');nm.placeholder='nazwa na stronie, np. TeamSpeak';nm.maxLength=60;nm.value=c.name||'';nm.oninput=()=>{c.name=nm.value};
+  const gr=el('input');gr.placeholder='grupa (opcjonalnie)';gr.maxLength=40;gr.value=c.group||'';gr.oninput=()=>{c.group=gr.value};
+  const ty=el('select');for(const [v,l] of [['docker','kontener Docker'],['unit','usługa systemd'],['host','cały serwer']])ty.append(new Option(l,v));ty.value=c.type||'docker';
+  const ho=el('select');ho.append(new Option('maszyna…',''));for(const n of [...D.hosts.keys()].sort())ho.append(new Option(n,n));if(c.host&&!D.hosts.has(c.host))ho.append(new Option(c.host,c.host));ho.value=c.host||'';
+  const ta=el('select');
+  const fill=()=>{
+    ta.textContent='';ta.style.visibility=c.type==='host'?'hidden':'';
+    const s=D.stat.get(c.host);let opts=s?(c.type==='docker'?[...s.cmap.keys()]:[...s.umap.keys()].filter(n=>/\.service$/.test(n))):[];
+    opts.sort();if(c.target&&!opts.includes(c.target))opts.unshift(c.target);
+    ta.append(new Option(c.type==='docker'?'kontener…':'usługa…',''));for(const o of opts)ta.append(new Option(o,o));ta.value=c.target||'';
+  };
+  fill();
+  ty.onchange=()=>{c.type=ty.value;c.target='';fill()};
+  ho.onchange=()=>{c.host=ho.value;c.target='';fill()};
+  ta.onchange=()=>{c.target=ta.value};
+  const st=(SC.states||{})[c.id],chip=el('span','chip '+(st==='ok'?'ok':st==='partial'?'wrn':st==='down'?'bad':''),st==='ok'?'działa':st==='partial'?'z problemem':st==='down'?'nie działa':'nowa');
+  chip.title='stan teraz (odświeża się co minutę po zapisaniu)';
+  const up=el('button','','↑'),dn=el('button','','↓'),rm=el('button','','✕');
+  up.title='wyżej';dn.title='niżej';rm.title='usuń z listy';up.disabled=!i;dn.disabled=i===SC.components.length-1;
+  const mv=d=>{const a=SC.components;[a[i],a[i+d]]=[a[i+d],a[i]];renderStat()};
+  up.onclick=()=>mv(-1);dn.onclick=()=>mv(1);rm.onclick=()=>{SC.components.splice(i,1);renderStat()};
+  r.append(nm,gr,ty,ho,ta,chip,up,dn,rm);
+  return r;
+}
+$('#sadd').onclick=()=>{SC.components.push({name:'',group:'',type:'docker',host:'',target:''});renderStat();const ins=$('#scomps').querySelectorAll('.srow input');if(ins.length)ins[ins.length-2].focus()};
+$('#stitle').oninput=()=>{SC.title=$('#stitle').value};
+$('#ssave').onclick=async()=>{
+  const m=$('#smsg');m.style.color='';m.textContent='Zapisuję…';
+  try{const st=SC.states;SC=await napi('status','PUT',{title:SC.title,components:SC.components});SC.states=Object.assign({},st,SC.states||{});renderStat();m.style.color='var(--acc)';m.textContent='Zapisano. Strona publiczna pokaże zmiany w ciągu minuty.'}
+  catch(e){m.style.color='var(--err)';m.textContent=e.message}
+};
+
 // ------------------------------------------------------------------ zadania cron
 // uruchomienia: zrodlo "cron" (jeden wpis na uruchomienie, z kodem wyjscia); lista zadan: zrodlo "crondef"
 async function loadCron(){
@@ -1439,21 +1507,45 @@ async function reload(){
     if(!rows.length)log.append(el('div','n','Brak logów w wybranym zakresie.'+(live&&!win?' Nowe linie pojawią się tutaj same.':'')));
     append(rows,true);
     status(rows.length>=LIMIT?'Pokazano '+LIMIT+' najnowszych linii z zakresu. Zawęź wyszukiwanie, żeby zobaczyć starsze.':'');
-    if(live&&!win)await tail(q,signal);
+    if(live&&!win){cur.q=q;await tail(q,signal)}
   }catch(e){if(e.name!=='AbortError'&&me)status('Błąd: '+e.message)}
 }
+// na zywo: strumien z bazy; po zerwaniu (restart centrali, tunel Cloudflare ucinajacy ciche polaczenia)
+// dociagamy brakujace linie z ostatnich minut i laczymy sie ponownie
+let lastData=0;
 async function tail(q,signal){
-  const rd=(await api('tail',{query:q},signal)).body.getReader(),dec=new TextDecoder();
-  let buf='';
-  for(;;){
-    const {done,value}=await rd.read();
-    if(done)break;
-    buf+=dec.decode(value,{stream:true});
-    const i=buf.lastIndexOf('\n');
-    if(i<0)continue;
-    append(parseLines(buf.slice(0,i)));buf=buf.slice(i+1);
-  }
-  if(!signal.aborted){status('Połączenie na żywo przerwane, ponawiam…');setTimeout(()=>{if(!signal.aborted)reload()},3000)}
+  lastData=Date.now();
+  let rd;
+  try{rd=(await api('tail',{query:q},signal)).body.getReader()}
+  catch(e){if(!signal.aborted&&e.name!=='AbortError')again(q,signal,e);return}
+  const dec=new TextDecoder();let buf='';
+  try{
+    for(;;){
+      const {done,value}=await rd.read();
+      if(done)break;
+      lastData=Date.now();
+      buf+=dec.decode(value,{stream:true});
+      const i=buf.lastIndexOf('\n');
+      if(i<0)continue;
+      append(parseLines(buf.slice(0,i)));buf=buf.slice(i+1);
+    }
+  }catch(e){if(signal.aborted||e.name==='AbortError')return;return again(q,signal,e)}
+  if(!signal.aborted)again(q,signal);
+}
+function again(q,signal,e){
+  status('Połączenie na żywo przerwane'+(e?' ('+e.message+')':'')+', łączę ponownie…');
+  setTimeout(async()=>{
+    if(signal.aborted)return;
+    await catchUp(q,signal);
+    if(!signal.aborted){status('');tail(q,signal)}
+  },3000);
+}
+// linie z ostatnich minut, ktorych strumien mogl nie dowiezc (duplikaty odrzuca append)
+async function catchUp(q,signal){
+  try{
+    const rows=parseLines(await(await api('query',{query:q+' _time:5m',limit:500},signal)).text()).sort((a,b)=>a._time<b._time?-1:a._time>b._time?1:0);
+    if(!signal.aborted)append(rows);
+  }catch{}
 }
 let posT;
 log.onscroll=()=>{
@@ -1471,7 +1563,7 @@ log.onscroll=()=>{
 for(const b of document.querySelectorAll('#nav button'))b.onclick=()=>{
   const g=b.dataset.go;
   if(g==='cron'){cronHost=null;renderCron();show(g);if(Date.now()-I.cronT>6e4)loadCron();return}
-  if(g==='over'||g==='notif'||g==='users')return show(g);
+  if(g==='over'||g==='notif'||g==='users'||g==='status')return show(g);
   pick(ALL,{title:g==='err'?'Błędy i ostrzeżenia':'Wszystkie logi',multi:true},g==='err'?'w':'',g==='err'?'1d':null);
 };
 for(const b of document.querySelectorAll('[data-tog]'))b.onclick=()=>document.body.classList.toggle('nos');

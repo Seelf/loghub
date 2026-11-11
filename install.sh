@@ -122,6 +122,7 @@ services:
     volumes:
       - ./notify:/app:ro
       - ./notifydata:/data
+      - ./status:/status
       - /etc/localtime:/etc/localtime:ro
     depends_on:
       - victorialogs
@@ -132,11 +133,13 @@ services:
     ports:
       - "${PORT:-8080}:8080"
       - "127.0.0.1:8081:8081"
+      - "127.0.0.1:8082:8082"
     environment:
       - INGEST_TOKEN=${INGEST_TOKEN}
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
       - ./www:/srv:ro
+      - ./status:/srv/status:ro
     depends_on:
       - victorialogs
       - auth
@@ -213,13 +216,38 @@ EOF
 		import app https
 	}
 }
+
+# Publiczna strona statusu (np. przez Cloudflare Tunnel na localhost:8082): tylko dwa statyczne pliki.
+# Nie ma tu zadnego polaczenia z baza logow, logowaniem ani powiadomieniami.
+:8082 {
+	header {
+		X-Frame-Options DENY
+		X-Content-Type-Options nosniff
+		Referrer-Policy no-referrer
+		Content-Security-Policy "default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; connect-src 'self'; img-src data:; base-uri 'none'; form-action 'none'; frame-ancestors 'none'"
+		-Server
+	}
+	@files {
+		method GET HEAD
+		path / /index.html /status.json
+	}
+	handle @files {
+		header /status.json Cache-Control "no-cache"
+		root * /srv/status
+		encode gzip
+		file_server
+	}
+	handle {
+		respond 404
+	}
+}
 EOF
 }
 
 fetch_hub_files() {
   local src="${BASH_SOURCE[0]:-}" dir="" f
   [ -n "$src" ] && [ -f "$src" ] && dir="$(dirname "$(readlink -f "$src")")/hub"
-  for f in www/index.html www/demo.js auth/auth.py notify/notify.py; do
+  for f in www/index.html www/demo.js auth/auth.py notify/notify.py status/index.html; do
     if [ -n "$dir" ] && [ -f "$dir/$f" ]; then
       install -m 644 "$dir/$f" "$HUB_DIR/$f"
     else
@@ -243,7 +271,7 @@ cmd_hub() {
   USE_TS="${USE_TS:-1}"
   setup_tailscale
 
-  mkdir -p "$HUB_DIR/data" "$HUB_DIR/www" "$HUB_DIR/auth" "$HUB_DIR/authdata" "$HUB_DIR/notify" "$HUB_DIR/notifydata"
+  mkdir -p "$HUB_DIR/data" "$HUB_DIR/www/status" "$HUB_DIR/auth" "$HUB_DIR/authdata" "$HUB_DIR/notify" "$HUB_DIR/notifydata" "$HUB_DIR/status"
   chmod 700 "$HUB_DIR/authdata" "$HUB_DIR/notifydata"
   if [ ! -f "$HUB_DIR/.env" ]; then
     printf 'INGEST_TOKEN=%s\nRETENTION=%s\nVL_TAG=latest\nPORT=%s\n' \
@@ -287,6 +315,7 @@ cmd_hub() {
   echo "  Podglad demo:  $hub_url/?demo   (przykladowe dane, bez agentow)"
   echo "  Uzytkownicy:   loghub user add NAZWA [--role admin|viewer]"
   echo "  Publicznie:    loghub public on   (sama strona z logowaniem 2FA, HTTPS przez Tailscale Funnel)"
+  echo "  Status usług:  $hub_url/status/   (publicznie: Cloudflare Tunnel -> http://localhost:8082)"
   echo
   echo "Instalacja agenta na kazdej maszynie:"
   echo "  curl -fsSL $REPO_RAW/install.sh | sudo bash -s -- agent \\"
