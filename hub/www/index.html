@@ -152,6 +152,13 @@ main{flex:1;min-width:0;display:flex;flex-direction:column}
 .bar i{display:block;height:100%;background:var(--acc)}
 .bar i.w{background:var(--warn)}.bar i.e{background:var(--err)}
 .probs{display:flex;flex-wrap:wrap;gap:5px}
+.dlist{display:flex;flex-direction:column;gap:5px;border-top:1px solid var(--line);padding-top:8px}
+.dl{display:grid;grid-template-columns:minmax(0,1fr) 56px 132px;gap:8px;align-items:center;font-size:12px}
+.dl span:first-child{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-family:var(--mono)}
+.dl .num{text-align:right;color:var(--mut);white-space:nowrap;font-size:11px}
+#dtbl,#ptbl{border:1px solid var(--line);border-radius:12px;background:var(--card);overflow-x:auto;margin-top:10px}
+#dtbl .tr{grid-template-columns:minmax(120px,1fr) minmax(160px,1.6fr) 90px minmax(170px,1.6fr) minmax(150px,1.3fr);min-width:800px;cursor:default}
+#ptbl .tr{grid-template-columns:minmax(120px,1fr) 60px minmax(140px,1.3fr) 80px minmax(130px,1.2fr) minmax(170px,1.4fr);min-width:780px;cursor:default}
 .guests{display:flex;flex-direction:column;gap:3px;border-top:1px solid var(--line);padding-top:8px}
 .guests>div{display:grid;grid-template-columns:12px 1fr 52px 96px;gap:8px;align-items:center;font-size:12px}
 .guests span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -251,7 +258,7 @@ mark{background:var(--hl);color:inherit;border-radius:2px}
   <section id="over">
     <header><button class="tog" data-tog title="Pokaż lub ukryj panel">☰</button><div><h1>Przegląd</h1><div class="mut" id="osub">Stan serwerów i źródeł logów z ostatnich 24 godzin.</div></div></header>
     <div id="tiles" class="tiles"></div>
-    <div id="tabs"><button data-tab="hosts" class="on">Serwery</button><button data-tab="units">Źródła</button><button data-tab="res">Zasoby</button><button data-tab="errs">Ostatnie błędy</button></div>
+    <div id="tabs"><button data-tab="hosts" class="on">Serwery</button><button data-tab="units">Źródła</button><button data-tab="res">Zasoby</button><button data-tab="disks">Dyski</button><button data-tab="ports">Porty</button><button data-tab="errs">Ostatnie błędy</button></div>
     <div id="cards"></div>
     <div id="units" hidden>
       <div id="tools">
@@ -269,6 +276,18 @@ mark{background:var(--hl);color:inherit;border-radius:2px}
         <select id="rtype" aria-label="Rodzaj"><option value="">wszystko</option><option value="host">maszyny</option><option value="ct">kontenery Docker</option><option value="guest">LXC i VM (Proxmox)</option></select>
       </div>
       <div id="rtbl"></div>
+    </div>
+    <div id="diskv" hidden>
+      <div class="mut">Wszystkie zamontowane dyski i udziały oraz stan fizycznych dysków (SMART, sprawdzany co 10 min na maszynach fizycznych) i pul ZFS.</div>
+      <div id="dtbl"></div>
+    </div>
+    <div id="portv" hidden>
+      <div style="display:flex;flex-wrap:wrap;gap:8px">
+        <input id="ps" placeholder="szukaj portu, procesu lub maszyny" aria-label="Szukaj portu" style="flex:1 1 200px">
+        <select id="pscope" aria-label="Zakres"><option value="">wszystkie</option><option value="all">otwarte na wszystkich interfejsach</option><option value="lan">sieć lokalna</option><option value="ts">Tailscale</option><option value="local">tylko lokalnie</option></select>
+        <select id="pproto" aria-label="Protokół"><option value="">TCP i UDP</option><option value="tcp">TCP</option><option value="udp">UDP</option></select>
+      </div>
+      <div id="ptbl"></div>
     </div>
   </section>
 
@@ -475,7 +494,8 @@ function readStat(rows){
     m.set(o.host,{t,o,cpu:fnum(o.cpu),mem:fnum(o.mem_pct),disk:fnum(o.disk_pct),cores:+o.cores||1,load:fnum(o.load1),
       memT:+o.mem_total_kb||0,memA:+o.mem_avail_kb||0,diskU:+o.disk_used_kb||0,diskT:+o.disk_total_kb||0,
       cmap:new Map(pj(o.containers).map(c=>[c.n,Object.assign({},c,cs.get(c.n)||{})])),
-      umap:new Map(pj(o.units).map(x=>[x[0],x])),guests:pj(o.guests)});
+      umap:new Map(pj(o.units).map(x=>[x[0],x])),guests:pj(o.guests),
+      disks:pj(o.disks).filter(d=>Array.isArray(d)&&d[4]>0),pools:pj(o.pools),smart:pj(o.smart),ports:o.ports==null?null:pj(o.ports)});
   }
   return m;
 }
@@ -646,8 +666,24 @@ function renderOver(light){
     const s=D.stat.get(h.name),res=[];
     if(s){
       const ms=el('div','meters');
-      ms.append(meter('CPU',s.cpu,s.cores+' rdz., obc. '+(s.load==null?'–':dec(s.load))),meter('RAM',s.mem,s.memT?gb(s.memT-s.memA)+' / '+gb(s.memT):''),meter('Dysk /',s.disk,s.diskT?gb(s.diskU)+' / '+gb(s.diskT):''));
+      const top=s.disks.length?s.disks.slice().sort((a,b)=>b[3]/b[4]-a[3]/a[4])[0]:null;
+      ms.append(meter('CPU',s.cpu,s.cores+' rdz., obc. '+(s.load==null?'–':dec(s.load))),meter('RAM',s.mem,s.memT?gb(s.memT-s.memA)+' / '+gb(s.memT):''),
+        top?meter('Dysk',top[3]/top[4]*100,top[0]+' · '+gb(top[3])+' / '+gb(top[4])):meter('Dysk /',s.disk,s.diskT?gb(s.diskU)+' / '+gb(s.diskT):''));
       res.push(ms);
+      if(s.disks.length>1||s.smart.length||s.pools.length){
+        const dl=el('div','dlist');dl.append(el('span','lbl','Dyski i udziały'));
+        for(const d of s.disks.slice().sort((a,b)=>a[0].localeCompare(b[0]))){
+          const r=el('div','dl'),v=d[3]/d[4]*100,b=el('div','bar'),i=el('i',lvlc(v));i.style.width=Math.min(100,v)+'%';b.append(i);
+          const n=el('span','',d[0]);n.title=d[0]+' · '+d[2]+' · '+d[1];r.append(n,b,el('span','num',gb(d[3])+' / '+gb(d[4])));dl.append(r);
+        }
+        const chips=el('div','probs');
+        for(const x of s.smart){const [st,txt]=smartState(x);const c=el('span','chip '+(st==='bad'?'bad':st==='warn'?'wrn':'ok'),x[0].replace('/dev/','')+(x[4]!=null?' '+x[4]+'°C':'')+' · '+txt);c.title=(x[1]||'')+(x[5]!=null?' · '+num(x[5])+' h pracy':'')+(x[8]?' · '+x[8]:'');chips.append(c)}
+        for(const p of s.pools){const ok=p[3]==='ONLINE',c=el('span','chip '+(ok?'ok':'bad'),'ZFS '+p[0]+' · '+p[3]);chips.append(c)}
+        if(chips.children.length)dl.append(chips);
+        res.push(dl);
+      }
+      if(s.ports){const pub=s.ports.filter(x=>pscope(x[1])==='all'&&x[0]==='tcp').length,b=el('button','chip',s.ports.length+' portów nasłuchuje'+(pub?', '+pub+' TCP na wszystkich interfejsach':''));
+        b.style.alignSelf='flex-start';b.onclick=()=>{$('#ps').value=h.name;document.querySelector('#tabs button[data-tab=ports]').click()};res.push(b)}
       const hi=D.hist.get(h.name);
       if(hi){const r2=el('div','row');r2.append(el('span','lbl','CPU 24 h'),el('span','num mut','śr. '+pc(sum(hi.cpu.filter(x=>x!=null))/Math.max(1,hi.cpu.filter(x=>x!=null).length))));const sp2=el('div','sp');sparkPct(sp2,hi.cpu,30*6e4);res.push(r2,sp2)}
     }
@@ -681,7 +717,7 @@ function renderOver(light){
     b2.onclick=()=>pick('{host='+quote(h.name)+'}',meta,'e','1d');b2.disabled=!h.e24;
     ft.append(b1,b2);c.append(hd,...res,r,sp,types,kv,ft);cards.append(c);
   }
-  renderUnits();renderRes();
+  renderUnits();renderRes();renderDisks();renderPorts();
   const lt=Math.max(0,...[...D.stat.values()].map(s=>s.t));
   $('#osub').textContent='Stan serwerów i logi z ostatnich 24 godzin.'+(lt?' Zasoby odświeżane na bieżąco, ostatni pomiar '+rel(lt)+'.':'');
   if(tab==='errs'&&!light)loadErrs();
@@ -715,17 +751,71 @@ async function loadErrs(){
 }
 for(const b of document.querySelectorAll('#tabs button'))b.onclick=()=>{
   tab=b.dataset.tab;for(const x of document.querySelectorAll('#tabs button'))x.classList.toggle('on',x===b);
-  $('#cards').hidden=tab!=='hosts';$('#units').hidden=tab!=='units';$('#errs').hidden=tab!=='errs';$('#resv').hidden=tab!=='res';
+  $('#cards').hidden=tab!=='hosts';$('#units').hidden=tab!=='units';$('#errs').hidden=tab!=='errs';$('#resv').hidden=tab!=='res';$('#diskv').hidden=tab!=='disks';$('#portv').hidden=tab!=='ports';
   if(tab==='errs')loadErrs();
 };
 $('#us').oninput=$('#usort').onchange=$('#udir').onchange=renderUnits;
+
+// stan dysku z SMART: [stan, opis]
+function smartState(x){
+  const hl=String(x[3]||'').toUpperCase();
+  if(hl&&hl!=='PASSED'&&hl!=='OK')return ['bad','awaria ('+x[3]+')'];
+  if((x[6]||0)>0||(x[7]||0)>0)return ['warn','sektory: '+(x[6]||0)+' przen., '+(x[7]||0)+' oczek.'];
+  return hl?['ok','SMART OK']:['', 'brak danych SMART'];
+}
+// zakres adresu nasluchu
+function pscope(a){
+  a=String(a);
+  if(a==='*'||a==='0.0.0.0'||a==='::')return 'all';
+  if(/^127\.|^::1$|^localhost/.test(a))return 'local';
+  if(/^100\.(6[4-9]|[7-9]\d|1[01]\d|12[0-7])\.|^fd7a:115c:a1e0/i.test(a))return 'ts';
+  return 'lan';
+}
+const PSC={all:'wszystkie interfejsy',local:'tylko lokalnie',ts:'Tailscale',lan:'sieć lokalna / adres'};
+function renderDisks(){
+  const tbl=$('#dtbl');tbl.textContent='';
+  const hd=el('div','tr h');for(const x of ['Maszyna','Punkt montowania','Typ','Zajętość','Źródło / stan'])hd.append(el('span','',x));tbl.append(hd);
+  let n=0;
+  for(const [host,s] of [...D.stat].sort((a,b)=>a[0].localeCompare(b[0]))){
+    for(const d of s.disks.slice().sort((a,b)=>a[0].localeCompare(b[0]))){
+      const r=el('div','tr'),v=d[3]/d[4]*100,c=el('span','vol'),b=el('i');b.style.width=Math.max(1,Math.min(100,v))+'%';if(lvlc(v))b.style.background=lvlc(v)==='e'?'var(--err)':'var(--warn)';
+      c.append(el('span','',pc(v)),b);c.title=gb(d[3])+' / '+gb(d[4]);
+      const m=el('span','',d[0]);m.style.fontFamily='var(--mono)';
+      r.append(el('span','',host),m,el('span','mut',d[1]),c,el('span','mut',gb(d[3])+' / '+gb(d[4])+' · '+d[2]));tbl.append(r);n++;
+    }
+    for(const x of s.smart){
+      const [st,txt]=smartState(x),r=el('div','tr'),c=el('span');c.append(el('span','chip '+(st==='bad'?'bad':st==='warn'?'wrn':'ok'),txt));
+      r.append(el('span','',host),el('span','',x[0]+' · '+(x[1]||'dysk')),el('span','mut',(x[8]||'dysk').toUpperCase()),c,el('span','mut',[x[2]?gb(x[2]/1024):'',x[4]!=null?x[4]+'°C':'',x[5]!=null?num(x[5])+' h pracy':''].filter(Boolean).join(' · ')));tbl.append(r);n++;
+    }
+    for(const p of s.pools){
+      const r=el('div','tr'),ok=p[3]==='ONLINE',v=p[1]?p[2]/p[1]*100:null,c=el('span');c.append(el('span','chip '+(ok?'ok':'bad'),p[3]));
+      r.append(el('span','',host),el('span','','pula ZFS '+p[0]),el('span','mut','ZFS'),c,el('span','mut',v==null?'':pc(v)+' · '+gb(p[2]/1024)+' / '+gb(p[1]/1024)));tbl.append(r);n++;
+    }
+  }
+  if(!n)tbl.append(el('div','n','Brak danych o dyskach. Zaktualizuj agentów (ta sama komenda instalacji).'));
+}
+function renderPorts(){
+  const t=$('#ps').value.trim().toLowerCase(),sc=$('#pscope').value,pr=$('#pproto').value,tbl=$('#ptbl');tbl.textContent='';
+  const hd=el('div','tr h');for(const x of ['Maszyna','Prot.','Adres','Port','Proces','Dostępny z'])hd.append(el('span','',x));tbl.append(hd);
+  const rows=[];
+  for(const [host,s] of D.stat)for(const x of s.ports||[])rows.push({host,proto:x[0],addr:x[1],port:x[2],proc:x[3]||'',sc:pscope(x[1])});
+  const rs=rows.filter(r=>(!sc||r.sc===sc)&&(!pr||r.proto===pr)&&(!t||(r.host+' '+r.port+' '+r.proc+' '+r.addr).toLowerCase().includes(t)))
+    .sort((a,b)=>a.host.localeCompare(b.host)||a.port-b.port||a.proto.localeCompare(b.proto));
+  for(const r of rs){
+    const row=el('div','tr'),sp=el('span');sp.append(el('span','chip '+(r.sc==='all'?'wrn':r.sc==='local'?'':'ok'),PSC[r.sc]));
+    const pt=el('span','num',r.port);pt.style.fontFamily='var(--mono)';
+    row.append(el('span','',r.host),el('span','mut',r.proto.toUpperCase()),el('span','mut',r.addr),pt,el('span','',r.proc||'–'),sp);tbl.append(row);
+  }
+  if(!rs.length)tbl.append(el('div','n',rows.length?'Nic nie pasuje do filtra.':'Brak danych o portach. Zaktualizuj agentów (ta sama komenda instalacji).'));
+}
+$('#ps').oninput=$('#pscope').onchange=$('#pproto').onchange=renderPorts;
 
 // zakladka Zasoby: maszyny, kontenery Docker, goscie Proxmoxa
 function renderRes(){
   const rows=[];
   for(const [host,s] of D.stat){
     const hh=D.hosts.get(host),on=hh?hh.up:true;
-    rows.push({type:'host',name:host,kind:'maszyna',where:'',st:on?(hh&&hh.bad.length?'bad':'up'):'down',stt:on?'agent działa':'brak kontaktu',cpu:s.cpu,cpuT:pc(s.cpu)+' z '+s.cores+' rdz.',ram:s.mem,ramT:s.memT?gb(s.memT-s.memA)+' / '+gb(s.memT):'',note:'dysk '+pc(s.disk)+(s.load!=null?' · obc. '+dec(s.load):''),sel:'{host='+quote(host)+'}',meta:{title:host,host,multi:true}});
+    rows.push({type:'host',name:host,kind:'maszyna',where:'',st:on?(hh&&hh.bad.length?'bad':'up'):'down',stt:on?'agent działa':'brak kontaktu',cpu:s.cpu,cpuT:pc(s.cpu)+' z '+s.cores+' rdz.',ram:s.mem,ramT:s.memT?gb(s.memT-s.memA)+' / '+gb(s.memT):'',note:(s.disks.length?s.disks.length+' dysk. · max '+pc(Math.max(...s.disks.map(d=>d[3]/d[4]*100))):'dysk '+pc(s.disk))+(s.load!=null?' · obc. '+dec(s.load):''),sel:'{host='+quote(host)+'}',meta:{title:host,host,multi:true}});
     for(const c of s.cmap.values()){
       const [st,stt]=cstate(c),cpu=fnum(c.cpu),ram=fnum(c.memp);
       rows.push({type:'ct',name:c.n,kind:'Docker',where:host,st,stt,cpu,cpuT:cpu==null?'–':pc(cpu),ram,ramT:c.mem?String(c.mem).split('/')[0].trim():'',note:c.st||'',sel:selOf({host,source:'docker',unit:c.n}),meta:{title:c.n,host,source:'docker',unit:c.n}});
@@ -761,15 +851,15 @@ async function napi(path,method,body){
   return d;
 }
 const RULES=[['host_offline','Serwer bez kontaktu z centralą',[['minutes','po',' min']]],['service_down','Padnięty kontener Dockera lub usługa systemd',[]],['cron_failed','Zadanie cron zakończone błędem',[]],
-  ['disk','Zapełniony dysk',[['pct','od','%']]],['cpu','Wysokie CPU',[['pct','od','%'],['minutes','średnio przez',' min']]],['mem','Wysoki RAM',[['pct','od','%'],['minutes','średnio przez',' min']]],
+  ['disk','Zapełniony dysk (każdy osobno)',[['pct','od','%']]],['disk_health','Awaria dysku (SMART) lub pula ZFS nie w stanie ONLINE',[]],['ports','Nowy lub zamknięty port TCP (poza lokalnymi)',[]],['cpu','Wysokie CPU',[['pct','od','%'],['minutes','średnio przez',' min']]],['mem','Wysoki RAM',[['pct','od','%'],['minutes','średnio przez',' min']]],
   ['errors','Dużo błędów w logach jednego źródła',[['count','od',' błędów'],['minutes','w ciągu',' min']]]];
 const CHT={ntfy:['ntfy',[['url','Adres tematu, np. https://ntfy.sh/twoj-temat'],['token','Token (opcjonalnie)']]],telegram:['Telegram',[['bot_token','Token bota (od @BotFather)'],['chat_id','Chat ID']]],
   discord:['Discord',[['url','Adres webhooka kanału']]],webhook:['Webhook',[['url','Adres (POST z JSON)']]],email:['E-mail',[['host','Serwer SMTP'],['port','Port (587 albo 465)'],['user','Login'],['password','Hasło'],['from','Nadawca'],['to','Odbiorca']]]};
 let NC=null,ndirty=false;
 function alertRow(a,hist){
-  const r=el('div','al '+(hist&&a.kind!=='cron_failed'?'ok':a.sev||'error')),d=el('div');
+  const ev=a.since&&a.since===a.until,r=el('div','al '+(hist&&!ev?'ok':a.sev||'error')),d=el('div');
   d.append(el('b','',a.title));if(a.detail)d.append(el('small','',a.detail));
-  const t=el('time','',hist?(a.kind==='cron_failed'?rel(a.since*1e3):'minęło '+rel(a.until*1e3)+(a.since?' · trwało '+dur(Math.max(60,a.until-a.since)):'')):'od '+rel(a.since*1e3).replace(' temu',''));
+  const t=el('time','',hist?(ev?rel(a.since*1e3):'minęło '+rel(a.until*1e3)+(a.since?' · trwało '+dur(Math.max(60,a.until-a.since)):'')):'od '+rel(a.since*1e3).replace(' temu',''));
   r.append(d,t);
   if(a.host&&D.hosts.has(a.host)){
     r.classList.add('click');r.tabIndex=0;
@@ -946,7 +1036,7 @@ function resBox(){
   if(!cur)return;
   const m=cur.meta,s=m.host?D.stat.get(m.host):null,box=$('#resbox');let lab='',val='';
   if(s&&m.source==='docker'){const c=s.cmap.get(m.unit);if(c){lab='Kontener';val=c.cpu!=null?'CPU '+pc(fnum(c.cpu))+' · RAM '+String(c.mem||'').split('/')[0].trim():cstate(c)[1]}}
-  else if(s&&!m.unit){lab='Serwer';val='CPU '+pc(s.cpu)+' · RAM '+pc(s.mem)+' · dysk '+pc(s.disk)}
+  else if(s&&!m.unit){lab='Serwer';val='CPU '+pc(s.cpu)+' · RAM '+pc(s.mem)+' · dysk '+(s.disks.length?pc(Math.max(...s.disks.map(d=>d[3]/d[4]*100))):pc(s.disk))}
   else if(s&&m.source==='journald'&&/\.service$/.test(m.unit)){lab='Usługa';val=ustate({host:m.host,source:'journald',unit:m.unit})[1]}
   box.hidden=!val;$('#reslbl').textContent=lab;$('#resval').textContent=val;
 }

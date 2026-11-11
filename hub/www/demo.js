@@ -219,6 +219,20 @@
         return { n: c.n, cpu: cp.toFixed(2) + '%', mem: mb + 'MiB / ' + ram + 'GiB', memp: (mb / ram / 10.24).toFixed(2) + '%' };
       }));
     }
+    const GB = 1048576, dk = [['/', 'ext4', host === 'pve' ? '/dev/mapper/pve-root' : '/dev/sda1', Math.round(disk * GB * dsk / 100), disk * GB]];
+    if (host === 'pve') dk.push(['/mnt/nas_share', 'ext4', '/dev/sdb1', Math.round(1863 * GB * 0.45), 1863 * GB], ['/mnt/data', 'ext4', '/dev/sdc1', Math.round(1863 * GB * 0.83), 1863 * GB]);
+    if (host === 'media') dk.push(['/mnt/data', 'ext4', '/dev/sdc1', Math.round(1863 * GB * 0.83), 1863 * GB]);
+    o.disks = JSON.stringify(dk);
+    if (host === 'pve') {
+      o.smart = JSON.stringify([['/dev/nvme0n1', 'Samsung SSD 980 500GB', 500107862016, 'PASSED', 41, 12345, null, null, 'nvme'],
+        ['/dev/sdb', 'WDC WD20EZRZ-00Z5HB0', 2000398934016, 'PASSED', 37, 48213, 0, 8, 'usb'], ['/dev/sdc', 'ST2000DM008-2FR102', 2000398934016, 'PASSED', 39, 21004, 0, 0, 'usb']]);
+      o.pools = '[]';
+    }
+    const PORTS = { pve: [['tcp', '0.0.0.0', 22, 'sshd'], ['tcp', '0.0.0.0', 8006, 'pveproxy'], ['tcp', '0.0.0.0', 3128, 'spiceproxy'], ['tcp', '127.0.0.1', 85, 'pvedaemon'], ['tcp', '127.0.0.1', 25, 'master'], ['udp', '0.0.0.0', 41641, 'tailscaled'], ['tcp', '100.75.36.54', 8443, 'tailscaled']],
+      vps: [['tcp', '0.0.0.0', 22, 'sshd'], ['tcp', '0.0.0.0', 10011, 'ts3server'], ['tcp', '0.0.0.0', 30033, 'ts3server'], ['udp', '0.0.0.0', 9987, 'ts3server'], ['tcp', '127.0.0.1', 3306, 'mariadbd'], ['udp', '0.0.0.0', 41641, 'tailscaled']],
+      media: [['tcp', '0.0.0.0', 22, 'sshd'], ['tcp', '*', 8096, 'docker-proxy'], ['tcp', '*', 8989, 'docker-proxy'], ['tcp', '*', 7878, 'docker-proxy'], ['tcp', '*', 9696, 'docker-proxy'], ['tcp', '*', 8080, 'docker-proxy'], ['tcp', '192.168.0.120', 6767, 'docker-proxy']],
+      loghub: [['tcp', '0.0.0.0', 8080, 'docker-proxy'], ['tcp', '127.0.0.1', 8081, 'docker-proxy'], ['tcp', '0.0.0.0', 22, 'sshd']] };
+    o.ports = JSON.stringify(PORTS[host] || []);
     const units = U.filter(u => u[0] === host && u[1] === 'journald' && /\.service$/.test(u[2])).map(u => [u[2], 'active', 'running']);
     for (const f of FAILED[host] || []) units.push([f, 'failed', 'failed']);
     o.units = JSON.stringify(units);
@@ -234,7 +248,7 @@
   }
   let user = { user: 'admin', role: 'admin' };
   let NCFG = { rules: { host_offline: { on: true, minutes: 3 }, service_down: { on: true }, cron_failed: { on: true }, disk: { on: true, pct: 90 },
-    cpu: { on: true, pct: 90, minutes: 10 }, mem: { on: true, pct: 90, minutes: 10 }, errors: { on: false, count: 50, minutes: 5 } },
+    cpu: { on: true, pct: 90, minutes: 10 }, mem: { on: true, pct: 90, minutes: 10 }, errors: { on: false, count: 50, minutes: 5 }, disk_health: { on: true }, ports: { on: true } },
     notify_resolved: true, repeat_hours: 0, channels: [{ id: 'demo1', type: 'ntfy', on: true, name: 'telefon', url: 'https://ntfy.sh/moj-loghub', token: '' }] };
 
   window.loghubDemo = {
@@ -282,10 +296,12 @@
           { key: 'ct:media:tdarr', kind: 'service_down', host: 'media', unit: 'tdarr', title: 'media: kontener tdarr padł', detail: 'padł: Exited (137) 3 hours ago', sev: 'error', since: now - 182 * m },
           { key: 'unit:vps:fail2ban.service', kind: 'service_down', host: 'vps', unit: 'fail2ban.service', title: 'vps: usługa fail2ban.service padła', detail: 'systemd: failed', sev: 'error', since: now - 47 * m },
           { key: 'offline:backup', kind: 'host_offline', host: 'backup', unit: '', title: 'backup: brak kontaktu z agentem', detail: 'Brak pomiarów od ponad 3 min.', sev: 'error', since: now - 2880 * m },
-          { key: 'disk:media', kind: 'disk', host: 'media', unit: '', title: 'media: dysk zajęty w 91%', detail: 'Próg: 90%.', sev: 'warn', since: now - 600 * m },
+          { key: 'disk:media:/', kind: 'disk', host: 'media', unit: '', title: 'media: dysk / zajęty w 91%', detail: '466 z 512 GB (/dev/sda1). Próg: 90%.', sev: 'warn', since: now - 600 * m },
+          { key: 'sect:pve:/dev/sdb', kind: 'disk_health', host: 'pve', unit: '', title: 'pve: dysk /dev/sdb ma uszkodzone sektory', detail: 'WDC WD20EZRZ-00Z5HB0: przeniesione 0, oczekujące 8', sev: 'warn', since: now - 1440 * m },
           { key: 'ct:media:seerr', kind: 'service_down', host: 'media', unit: 'seerr', title: 'media: kontener seerr nie przechodzi kontroli zdrowia', detail: 'nie przechodzi kontroli zdrowia', sev: 'error', since: now - 300 * m }],
         history: [
           { kind: 'cron_failed', host: 'vps', unit: 'certbot renew --quiet', title: 'vps: zadanie cron zakończone błędem (kod 1)', detail: 'certbot renew --quiet', sev: 'error', since: now - 540 * m, until: now - 540 * m },
+          { kind: 'ports', host: 'vps', unit: '', title: 'vps: nowy otwarty port 0.0.0.0:30033', detail: 'proces: ts3server', sev: 'warn', since: now - 120 * m, until: now - 120 * m },
           { kind: 'cpu', host: 'media', unit: '', title: 'media: CPU 94% (średnio 10 min)', detail: 'Próg: 90%.', sev: 'warn', since: now - 260 * m, until: now - 228 * m },
           { kind: 'service_down', host: 'pve', unit: 'pveproxy.service', title: 'pve: usługa pveproxy.service padła', detail: 'systemd: failed', sev: 'error', since: now - 1500 * m, until: now - 1496 * m }],
       };

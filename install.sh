@@ -378,6 +378,10 @@ EOF
           if is_array(r.cstats) { r.cstats = encode_json(r.cstats) }
           if is_array(r.units) { r.units = encode_json(r.units) }
           if is_array(r.guests) { r.guests = encode_json(r.guests) }
+          if is_array(r.disks) { r.disks = encode_json(r.disks) }
+          if is_array(r.pools) { r.pools = encode_json(r.pools) }
+          if is_array(r.smart) { r.smart = encode_json(r.smart) }
+          if is_array(r.ports) { r.ports = encode_json(r.ports) }
           out = merge(out, r)
           out.host = "$NAME"
         }
@@ -598,6 +602,49 @@ while :; do
         if (l == "loaded" && a != "inactive") printf "%s[\"%s\",\"%s\",\"%s\"]", (n++ ? "," : ""), u, a, s }')
     extra="$extra,\"units\":[${un}]"
   fi
+  # wszystkie zamontowane systemy plikow (dyski, USB, udzialy sieciowe), bez wewnetrznych zbiorow Dockera i Proxmoxa
+  dk=$(timeout 10 df -PkT 2>/dev/null | awk '
+    function esc(x) { gsub(/\\/, "\\\\", x); gsub(/"/, "\\\"", x); return x }
+    NR > 1 && $2 ~ /^(ext[234]|xfs|btrfs|zfs|vfat|exfat|ntfs|ntfs3|fuseblk|nfs|nfs4|cifs|smb3|fuse\.sshfs|f2fs)$/ && $3 > 0 {
+      m = $7; for (i = 8; i <= NF; i++) m = m " " $i
+      if (m ~ /^\/(var\/lib\/docker|run|snap|proc|sys|dev)(\/|$)/) next
+      if ($1 ~ /subvol-[0-9]+-disk|vm-[0-9]+-disk|basevol-/) next
+      if ($2 == "vfat" && $3 < 4194304) next
+      k = $1 "|" $3; if (k in seen) next; seen[k] = 1
+      printf "%s[\"%s\",\"%s\",\"%s\",%d,%d]", (n++ ? "," : ""), esc(m), $2, esc($1), $4, $3 }')
+  extra="$extra,\"disks\":[${dk}]"
+  if command -v zpool >/dev/null 2>&1; then
+    zp=$(timeout 10 zpool list -Hp -o name,size,alloc,health 2>/dev/null | awk '{printf "%s[\"%s\",%s,%s,\"%s\"]", (n++ ? "," : ""), $1, $2, $3, $4}')
+    extra="$extra,\"pools\":[${zp}]"
+  fi
+  # stan dyskow fizycznych (SMART) co 10 minut; dziala tam, gdzie jest smartctl i dostep do dyskow (host, nie LXC)
+  if command -v smartctl >/dev/null 2>&1 && [ $(( $(date +%s) - ${smt:-0} )) -ge 600 ]; then
+    smt=$(date +%s); sm=""
+    for d in $(lsblk -dnpo NAME,TYPE 2>/dev/null | awk '$2=="disk" && $1 !~ /zd|rbd|nbd|loop/ {print $1}'); do
+      out=$(timeout 25 smartctl -H -i -A "$d" 2>/dev/null)
+      echo "$out" | grep -qE 'overall-health|SMART Health Status' || out=$(timeout 25 smartctl -d sat -H -i -A "$d" 2>/dev/null)
+      model=$(echo "$out" | sed -n -E 's/^(Device Model|Model Number|Product):[[:space:]]*//p' | head -1 | tr -d '"\\')
+      health=$(echo "$out" | sed -n -E 's/.*overall-health self-assessment test result:[[:space:]]*//p; s/^SMART Health Status:[[:space:]]*//p' | head -1 | tr -d '"\\')
+      temp=$(echo "$out" | awk '/Temperature_Celsius|Airflow_Temperature_Cel/ {print $10+0; exit} /^Temperature:/ {print $2+0; exit}')
+      hours=$(echo "$out" | awk '/Power_On_Hours/ {print $10+0; exit} /^Power On Hours:/ {gsub(",", "", $4); print $4+0; exit}')
+      realloc=$(echo "$out" | awk '/Reallocated_Sector_Ct/ {print $10+0; exit}')
+      pend=$(echo "$out" | awk '/Current_Pending_Sector/ {print $10+0; exit}')
+      size=$(lsblk -dnbo SIZE "$d" 2>/dev/null | head -1)
+      tran=$(lsblk -dno TRAN "$d" 2>/dev/null | head -1)
+      sm="${sm:+$sm,}[\"$d\",\"$model\",${size:-0},\"$health\",${temp:-null},${hours:-null},${realloc:-null},${pend:-null},\"$tran\"]"
+    done
+  fi
+  [ -n "${smt:-}" ] && extra="$extra,\"smart\":[${sm}]"
+  # nasluchujace porty TCP i UDP z nazwa procesu
+  if command -v ss >/dev/null 2>&1; then
+    po=$(ss -Hlntup 2>/dev/null | awk '
+      { l = $5; i = match(l, /:[0-9]+$/); if (!i) next
+        port = substr(l, i + 1); a = substr(l, 1, i - 1); gsub(/^\[|\]$/, "", a); sub(/%.*/, "", a)
+        pr = ""; if (match($0, /users:\(\("[^"]+"/)) pr = substr($0, RSTART + 9, RLENGTH - 10)
+        k = $1 "|" a "|" port; if (k in s) next; s[k] = 1
+        printf "%s[\"%s\",\"%s\",%d,\"%s\"]", (n++ ? "," : ""), $1, a, port, pr }')
+    extra="$extra,\"ports\":[${po}]"
+  fi
   if command -v pvesh >/dev/null 2>&1; then
     g=$(timeout 20 pvesh get /cluster/resources --type vm --output-format json 2>/dev/null)
     case "$g" in \[*) extra="$extra,\"guests\":$g" ;; esac
@@ -630,6 +677,10 @@ setup_status() {
   [ "$DO_STATUS" = 1 ] || return 0
   have journalctl && have systemctl || return 0
   say "Wlaczam pomiar zasobow i stanu uslug"
+  # stan dyskow (SMART) tylko na fizycznych maszynach; w LXC i VM nie ma dostepu do dyskow
+  if [ "$(systemd-detect-virt 2>/dev/null || true)" = "none" ] && ! have smartctl; then
+    apt-get install -y -qq smartmontools >/dev/null 2>&1 || warn "nie udalo sie zainstalowac smartmontools (stan dyskow nie bedzie widoczny)"
+  fi
   write_status_files
   systemctl daemon-reload
   systemctl enable loghub-status >/dev/null 2>&1 || true

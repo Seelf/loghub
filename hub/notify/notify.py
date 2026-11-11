@@ -40,6 +40,8 @@ DEFAULT = {
         "service_down": {"on": True},
         "cron_failed": {"on": True},
         "disk": {"on": True, "pct": 90},
+        "disk_health": {"on": True},
+        "ports": {"on": True},
         "cpu": {"on": True, "pct": 90, "minutes": 10},
         "mem": {"on": True, "pct": 90, "minutes": 10},
         "errors": {"on": False, "count": 50, "minutes": 5},
@@ -57,7 +59,7 @@ CHANNEL_FIELDS = {
 }
 
 LOCK = threading.Lock()
-ST = {"active": {}, "history": [], "checked_at": 0, "error": "", "seen_cron": []}
+ST = {"active": {}, "history": [], "checked_at": 0, "error": "", "seen_cron": [], "ports": {}}
 
 # ------------------------------------------------------------------ pliki
 
@@ -171,9 +173,27 @@ def evaluate(cfg):
                 if isinstance(u, list) and len(u) > 1 and u[1] == "failed":
                     fire("unit:%s:%s" % (h, u[0]), "service_down", h, u[0], "%s: usługa %s padła" % (h, u[0]), "systemd: failed")
         if R["disk"]["on"]:
-            d = fnum(o.get("disk_pct"))
-            if d is not None and d >= R["disk"]["pct"]:
-                fire("disk:" + h, "disk", h, "", "%s: dysk zajęty w %d%%" % (h, d), "Próg: %s%%." % R["disk"]["pct"], "warn")
+            disks = [d for d in jlist(o.get("disks")) if isinstance(d, list) and len(d) >= 5 and d[4]]
+            if not disks and fnum(o.get("disk_pct")) is not None:
+                disks = [["/", "", "", fnum(o.get("disk_pct")), 100]]
+            for d in disks:
+                pct = d[3] * 100.0 / d[4]
+                if pct >= R["disk"]["pct"]:
+                    fire("disk:%s:%s" % (h, d[0]), "disk", h, "", "%s: dysk %s zajęty w %d%%" % (h, d[0], pct),
+                         "%.0f z %.0f GB (%s). Próg: %s%%." % (d[3] / 1048576, d[4] / 1048576, d[2] or d[1], R["disk"]["pct"]), "warn")
+        if R["disk_health"]["on"]:
+            for x in jlist(o.get("smart")):
+                if not isinstance(x, list) or len(x) < 8:
+                    continue
+                dev, model, health = x[0], x[1] or x[0], str(x[3] or "")
+                if health and health.upper() not in ("PASSED", "OK"):
+                    fire("smart:%s:%s" % (h, dev), "disk_health", h, "", "%s: dysk %s zgłasza awarię (SMART: %s)" % (h, dev, health), model)
+                elif (x[6] or 0) > 0 or (x[7] or 0) > 0:
+                    fire("sect:%s:%s" % (h, dev), "disk_health", h, "", "%s: dysk %s ma uszkodzone sektory" % (h, dev),
+                         "%s: przeniesione %s, oczekujące %s" % (model, x[6] or 0, x[7] or 0), "warn")
+            for x in jlist(o.get("pools")):
+                if isinstance(x, list) and len(x) >= 4 and x[3] != "ONLINE":
+                    fire("pool:%s:%s" % (h, x[0]), "disk_health", h, "", "%s: pula ZFS %s w stanie %s" % (h, x[0], x[3]), "zpool status %s" % x[0])
 
     win = max(int(R["cpu"].get("minutes", 10)), int(R["mem"].get("minutes", 10)), 1)
     if R["cpu"]["on"] or R["mem"]["on"]:
@@ -193,6 +213,28 @@ def evaluate(cfg):
             if c >= R["errors"]["count"]:
                 fire("err:%s:%s" % (o.get("host"), o.get("unit")), "errors", o.get("host", ""), o.get("unit", ""),
                      "%s: %d błędów w %s w ciągu %d min" % (o.get("host"), c, o.get("unit"), m), "Próg: %s." % R["errors"]["count"], "warn")
+
+    if R["ports"]["on"]:
+        # zmiany nasluchujacych portow TCP poza adresami lokalnymi (127.x, ::1)
+        with LOCK:
+            prev = ST.setdefault("ports", {})
+            for h, o in latest.items():
+                if "ports" not in o:
+                    continue
+                cur = {}
+                for x in jlist(o.get("ports")):
+                    if isinstance(x, list) and len(x) >= 4 and x[0] == "tcp" and not str(x[1]).startswith(("127.", "::1")):
+                        cur["%s:%s" % (x[1], x[2])] = x[3]
+                old = prev.get(h)
+                prev[h] = cur
+                if old is None:
+                    continue
+                for k in sorted(set(cur) - set(old)):
+                    events.append({"key": "port+:%s:%s:%d" % (h, k, int(now)), "kind": "ports", "host": h, "unit": "",
+                                   "title": "%s: nowy otwarty port %s" % (h, k), "detail": "proces: %s" % (cur[k] or "nieznany"), "sev": "warn"})
+                for k in sorted(set(old) - set(cur)):
+                    events.append({"key": "port-:%s:%s:%d" % (h, k, int(now)), "kind": "ports", "host": h, "unit": "",
+                                   "title": "%s: port %s przestał nasłuchiwać" % (h, k), "detail": "proces: %s" % (old[k] or "nieznany"), "sev": "warn"})
 
     if R["cron_failed"]["on"]:
         for o in query('{source="cron"} NOT cron_state:=ok _time:%ds' % (EVERY * 3), 200):
