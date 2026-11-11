@@ -119,6 +119,11 @@ services:
       - LOGHUB_DATA=/data
       - VL_URL=http://victorialogs:9428
       - PUBLIC_URL=${PUBLIC_URL:-}
+      # dla panelu "Dodaj maszyne" (widzi go tylko administrator)
+      - INGEST_TOKEN=${INGEST_TOKEN}
+      - HUB_LAN_URL=${HUB_LAN_URL:-}
+      - HUB_TS_URL=${HUB_TS_URL:-}
+      - LOGHUB_REPO=${LOGHUB_REPO:-Seelf/loghub}
     volumes:
       - ./notify:/app:ro
       - ./notifydata:/data
@@ -281,6 +286,13 @@ cmd_hub() {
   chmod 600 "$HUB_DIR/.env"
   # shellcheck disable=SC1091
   . "$HUB_DIR/.env"
+  # adresy centrali do gotowych komend w panelu "Dodaj maszyne"
+  local ts0 lan0
+  ts0="$(tailscale ip -4 2>/dev/null | head -1 || true)"
+  lan0="$(hostname -I 2>/dev/null | awk '{print $1}')"
+  sed -i '/^HUB_LAN_URL=/d;/^HUB_TS_URL=/d;/^LOGHUB_REPO=/d' "$HUB_DIR/.env"
+  printf 'HUB_LAN_URL=%s\nHUB_TS_URL=%s\nLOGHUB_REPO=%s\n' "${lan0:+http://$lan0:$PORT}" "${ts0:+http://$ts0:$PORT}" "$REPO" >> "$HUB_DIR/.env"
+  chmod 600 "$HUB_DIR/.env"
 
   write_hub_files
   fetch_hub_files

@@ -578,6 +578,11 @@ class Handler(BaseHTTPRequestHandler):
             if not self.admin():
                 return self.send(403, {"error": "tylko administrator"})
             return self.send(200, masked(config()))
+        if p == "/api/notify/install":
+            if not self.admin():
+                return self.send(403, {"error": "tylko administrator"})
+            return self.send(200, {"token": os.environ.get("INGEST_TOKEN", ""), "lan": os.environ.get("HUB_LAN_URL", ""),
+                                   "ts": os.environ.get("HUB_TS_URL", ""), "repo": os.environ.get("LOGHUB_REPO", "Seelf/loghub")})
         if p == "/api/notify/status":
             if not self.admin():
                 return self.send(403, {"error": "tylko administrator"})

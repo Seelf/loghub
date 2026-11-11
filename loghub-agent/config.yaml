@@ -1,5 +1,5 @@
 name: loghub agent
-version: "1.0.0"
+version: "1.0.1"
 slug: loghub_agent
 description: Wysyła logi i stan Home Assistant OS do centrali loghub
 url: https://github.com/Seelf/loghub
@@ -19,6 +19,6 @@ options:
   token: ""
   name: haos
 schema:
-  hub: url
+  hub: str
   token: password
   name: "match(^[A-Za-z0-9._-]+$)"

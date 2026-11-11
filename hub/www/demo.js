@@ -162,7 +162,7 @@
     for (const u of U.filter(p.match)) {
       if (u[1] === 'cron') {
         const per = H / u[3];
-        for (let slot = Math.floor(now / per), k = 0; slot * per > now - p.ms && k < 300; slot--, k++) { const o = cronRun(u, slot); if (Date.parse(o._time) <= now) out.push(o); }
+        for (let slot = Math.floor(t1 / per), k = 0; slot * per > t1 - ms && k < 300; slot--, k++) { const o = cronRun(u, slot); if (Date.parse(o._time) <= t1) out.push(o); }
         continue;
       }
       const end = u[0] === OFFLINE ? Math.min(t1, now - 48 * H) : t1, span = Math.min(ms - (t1 - end), 400 / u[3] * H);
@@ -337,6 +337,7 @@
           { kind: 'cpu', host: 'media', unit: '', title: 'media: CPU 94% (średnio 10 min)', detail: 'Próg: 90%.', sev: 'warn', since: now - 260 * m, until: now - 228 * m },
           { kind: 'service_down', host: 'pve', unit: 'pveproxy.service', title: 'pve: usługa pveproxy.service padła', detail: 'systemd: failed', sev: 'error', since: now - 1500 * m, until: now - 1496 * m }],
       };
+      if (path === 'install') return { token: 'demo0token0to0tylko0podglad', lan: 'http://192.168.0.116:8080', ts: 'http://100.75.36.54:8080', repo: 'Seelf/loghub' };
       if (path === 'status' && method === 'PUT') {
         if ((body.components || []).some(c => !c.name)) throw new Error('każda usługa musi mieć nazwę widoczną na stronie');
         SCFG = { title: body.title || 'Status usług', components: body.components.map((c, i) => Object.assign({ id: c.id || 'd' + Date.now() + i }, c)) };

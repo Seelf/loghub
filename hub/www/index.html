@@ -215,9 +215,18 @@ main{flex:1;min-width:0;display:flex;flex-direction:column}
 .acts{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
 .acts .pri{background:var(--acc);border-color:var(--acc);color:var(--bg);font-weight:600}
 #nmsg{font-size:12px}
-#usersv,#statv{flex:1;overflow:auto;padding:18px 22px 28px;display:flex;flex-direction:column;gap:14px}
-#usersv>*,#statv>*{flex:none}
-#usersv>header,#statv>header{display:flex;align-items:flex-start;gap:10px}
+#usersv,#statv,#addv{flex:1;overflow:auto;padding:18px 22px 28px;display:flex;flex-direction:column;gap:14px}
+#usersv>*,#statv>*,#addv>*{flex:none}
+#usersv>header,#statv>header,#addv>header{display:flex;align-items:flex-start;gap:10px}
+.cmd{display:flex;align-items:flex-start;gap:8px;margin:6px 0;padding:8px 8px 8px 12px;background:var(--logbg,var(--panel));border:1px solid var(--line);border-radius:var(--rs)}
+.cmd code{flex:1;min-width:0;font:12px/1.6 var(--mono);white-space:pre-wrap;word-break:break-all}
+.cmd button{flex:none;padding:3px 10px}
+.steps{margin:4px 0 0;padding-left:20px;display:flex;flex-direction:column;gap:10px}
+.steps li{padding-left:2px}
+.aopts{display:flex;flex-wrap:wrap;gap:12px 18px;align-items:flex-end}
+.aopts label{display:flex;flex-direction:column;gap:4px;color:var(--mut)}
+.aopts label.ck{flex-direction:row;align-items:center;gap:7px}
+#addv h3{margin:14px 0 2px;font-size:13px}
 .srow{display:grid;grid-template-columns:minmax(130px,1.4fr) minmax(90px,1fr) 140px 120px minmax(130px,1.4fr) 92px repeat(3,32px);gap:6px;align-items:center}
 .srow button{padding:5px 0}
 .srow .chip{justify-content:center}
@@ -322,7 +331,8 @@ mark{background:var(--hl);color:inherit;border-radius:2px}
   #title{flex:1 1 100%}
   .stat .sp{display:none}
   #q{flex:1 1 100%}
-  #bar select{flex:1}
+  #bar select{flex:1 1 40%}
+  #day{flex:1 1 140px}#dfrom,#dto{flex:1 1 96px;min-width:96px}
 }
 @media(max-width:760px) and (prefers-reduced-motion:reduce){aside{transition:none}}
 @media(max-width:760px){.rule{grid-template-columns:24px 1fr}.rule .nums{grid-column:2}.kv{grid-template-columns:repeat(2,1fr)}.stat .sp{width:70px}}
@@ -359,6 +369,7 @@ mark{background:var(--hl);color:inherit;border-radius:2px}
     <button data-go="err">Błędy i ostrzeżenia<small class="chip bad" id="nerr" hidden></small></button>
     <button data-go="cron">Zadania cron<small class="chip bad" id="ncron" hidden></small></button>
     <button data-go="notif">Powiadomienia<small class="chip bad" id="nnot" hidden></small></button>
+    <button data-go="add" id="navadd" hidden>Dodaj maszynę</button>
     <button data-go="status" id="navstat" hidden>Strona statusu</button>
     <button data-go="users" id="navusers" hidden>Użytkownicy</button>
   </div>
@@ -457,6 +468,51 @@ mark{background:var(--hl);color:inherit;border-radius:2px}
     <div id="nhist" class="nlist"></div>
   </section>
 
+  <section id="addv" hidden>
+    <header><button class="tog" data-tog title="Pokaż lub ukryj panel">☰</button><div><h1>Dodaj maszynę</h1><div class="mut">Gotowe komendy z adresem centrali i tokenem. Jedna komenda na maszynę. Uruchomiona ponownie aktualizuje agenta; konta, 2FA i ustawienia zostają.</div></div></header>
+    <div class="panel">
+      <div class="aopts">
+        <label>Nazwa maszyny w panelu<input id="aname" maxlength="60" placeholder="domyślnie nazwa hosta"></label>
+        <label class="ck"><input type="checkbox" id="asudo">dodaj sudo (konto bez roota, np. Ubuntu)</label>
+      </div>
+      <span id="amsg" class="mut" role="status"></span>
+    </div>
+    <div class="panel">
+      <h2>Serwer z Linuksem w domowej sieci</h2>
+      <div class="mut">Debian, Ubuntu, Raspberry Pi OS, pojedynczy LXC albo VM. Logi idą po sieci lokalnej, bez Tailscale.</div>
+      <div class="cmd" data-k="lan"></div>
+    </div>
+    <div class="panel" id="avps">
+      <h2>VPS albo serwer poza domem</h2>
+      <div class="mut">Logi idą przez Tailscale. Jeśli Tailscale jest już zalogowany na tej maszynie, instalator go nie rusza. Jeśli go nie ma, zainstaluje go i wypisze link do zalogowania.</div>
+      <div class="cmd" data-k="vps"></div>
+    </div>
+    <div class="panel">
+      <h2>Host Proxmox: host, wszystkie LXC i VM naraz</h2>
+      <div class="mut">Uruchom na hoście jako root. Agent stanie na hoście, w każdym działającym LXC i w VM z QEMU Guest Agentem; VM i LXC pojawią się w drzewie pod hostem. Ta sama komenda później wszystko aktualizuje.</div>
+      <div class="cmd" data-k="pve"></div>
+      <h3>VM bez guest agenta</h3>
+      <ol class="steps">
+        <li>W środku VM zainstaluj agenta QEMU:<div class="cmd" data-k="gavm"></div></li>
+        <li>Na hoście włącz go w ustawieniach VM i uruchom ją od nowa (zamiast ID wpisz numer VM). Restart z wnętrza VM nie wystarczy, musi być wyłączenie i włączenie:<div class="cmd" data-k="gahost"></div></li>
+        <li>Sprawdź, czy odpowiada, a potem uruchom jeszcze raz komendę dla Proxmoxa:<div class="cmd" data-k="gachk"></div></li>
+      </ol>
+    </div>
+    <div class="panel">
+      <h2>Home Assistant OS</h2>
+      <ol class="steps">
+        <li>W Home Assistant: Ustawienia → Dodatki → Sklep z dodatkami → menu ⋮ → Repozytoria. Dodaj adres:<div class="cmd" data-k="harepo"></div></li>
+        <li>Odśwież sklep i zainstaluj <b>loghub agent</b>. Pierwsza instalacja trwa kilka minut, bo Home Assistant buduje dodatek u siebie.</li>
+        <li>W zakładce Konfiguracja wpisz:<br>hub<div class="cmd" data-k="hahub"></div>token<div class="cmd" data-k="hatok"></div>name (najlepiej nazwa tej VM w Proxmoxie)<div class="cmd" data-k="haname"></div></li>
+        <li>Uruchom dodatek. W zakładce Dziennik powinna pojawić się linia „wysylam do …”.</li>
+      </ol>
+    </div>
+    <div class="panel">
+      <h2>Usunięcie agenta z maszyny</h2>
+      <div class="cmd" data-k="del"></div>
+      <div class="mut">Logi zebrane wcześniej zostają w centrali.</div>
+    </div>
+  </section>
   <section id="statv" hidden>
     <header><button class="tog" data-tog title="Pokaż lub ukryj panel">☰</button><div><h1>Strona statusu</h1><div class="mut">Publiczna strona ze stanem wybranych usług i paskami dostępności z 90 dni. Nie pokazuje nazw maszyn, adresów ani logów: tylko nazwy, które tu wpiszesz.</div></div></header>
     <div class="panel">
@@ -501,7 +557,11 @@ mark{background:var(--hl);color:inherit;border-radius:2px}
       <select id="range" aria-label="Zakres czasu">
         <option value="15m">15 min</option><option value="1h" selected>1 godz.</option><option value="6h">6 godz.</option>
         <option value="1d">1 dzień</option><option value="7d">7 dni</option><option value="30d">30 dni</option><option value="100d">100 dni</option>
+        <option value="day">wybrany dzień…</option>
       </select>
+      <input type="date" id="day" aria-label="Dzień" hidden>
+      <input type="time" id="dfrom" aria-label="Od godziny" value="00:00" hidden>
+      <input type="time" id="dto" aria-label="Do godziny" value="23:59" hidden>
     </div>
     <div id="box"><div id="log"></div><div id="pos" hidden><span></span><u><i></i></u><span class="num"></span></div><button id="jump" hidden></button></div>
     <div id="st"><span id="msg"></span><span id="cnt"></span><a id="adv" href="/select/vmui/">zapytania zaawansowane</a></div>
@@ -565,7 +625,7 @@ function showLogin(msg){
 function enter(u){
   me=u;$('#login').hidden=true;$('#app').hidden=false;
   $('#who').textContent=u.user;$('#role').textContent=u.role==='admin'?'administrator':(u.hosts?'oglądający: '+(u.hosts.length?u.hosts.length+' masz.':'brak'):'oglądający');
-  $('#navusers').hidden=u.role!=='admin';$('#navstat').hidden=u.role!=='admin';if(view==='status'&&u.role!=='admin')view='over';$('#adv').hidden=!!u.hosts||!!demo();if(view==='users'&&u.role!=='admin')view='over';
+  $('#navusers').hidden=u.role!=='admin';$('#navstat').hidden=u.role!=='admin';$('#navadd').hidden=u.role!=='admin';if((view==='status'||view==='add')&&u.role!=='admin')view='over';$('#adv').hidden=!!u.hosts||!!demo();if(view==='users'&&u.role!=='admin')view='over';
   if(demo()){$('#demo').hidden=false;$('#adv').hidden=true}
   if(!started){started=true;setInterval(refresh,6e4);setInterval(()=>{if(me&&view==='logs')headStats()},3e4);setInterval(pollStat,15e3);setInterval(loadNotif,3e4);
     // gdy strumien milczy (np. tunel go wstrzymal), co 20 s dociagamy nowe linie zwyklym zapytaniem
@@ -902,7 +962,7 @@ function marks(){
   const k=view==='cron'&&cronHost?'':view!=='logs'?view:cur&&cur.sel===ALL?($('#lvl').value?'err':'all'):'';
   for(const b of document.querySelectorAll('#nav button'))b.classList.toggle('on',b.dataset.go===k);
 }
-function show(v){view=v;$('#over').hidden=v!=='over';$('#logs').hidden=v!=='logs';$('#cronv').hidden=v!=='cron';$('#notv').hidden=v!=='notif';$('#usersv').hidden=v!=='users';$('#statv').hidden=v!=='status';marks();if(v==='notif')loadNotif(true);if(v==='users')loadUsers();if(v==='status')loadStat()}
+function show(v){view=v;$('#over').hidden=v!=='over';$('#logs').hidden=v!=='logs';$('#cronv').hidden=v!=='cron';$('#notv').hidden=v!=='notif';$('#usersv').hidden=v!=='users';$('#statv').hidden=v!=='status';$('#addv').hidden=v!=='add';marks();if(v==='add')loadAdd();if(v==='notif')loadNotif(true);if(v==='users')loadUsers();if(v==='status')loadStat()}
 
 // -------------------------------------------------------------------- przeglad
 function renderOver(light){
@@ -1346,6 +1406,40 @@ $('#ntest').onclick=async()=>{
   catch(e){m.style.color='var(--err)';m.textContent='Nie wysłano: '+e.message}
 };
 
+// ------------------------------------------------------------- dodawanie maszyn
+let INS=null;
+async function loadAdd(){
+  if(!INS){try{INS=await napi('install')}catch(e){$('#amsg').textContent='Nie udało się pobrać danych centrali: '+e.message;return}}
+  renderAdd();
+}
+function renderAdd(){
+  if(!INS)return;
+  const raw='https://raw.githubusercontent.com/'+INS.repo+'/main/install.sh',nm=$('#aname').value.trim().replace(/[^A-Za-z0-9._-]/g,'');
+  const N=nm?' --name '+nm:'',S=$('#asudo').checked?'sudo ':'',lan=INS.lan||'http://IP-CENTRALI:8080',sh='curl -fsSL '+raw+' | '+S+'bash -s --';
+  $('#amsg').textContent=INS.lan?'':'Centrala nie podała swojego adresu w sieci lokalnej. Zaktualizuj ją (loghub hub) albo wpisz adres ręcznie zamiast IP-CENTRALI.';
+  $('#avps').hidden=!INS.ts;
+  const C={
+    lan:sh+' agent --hub '+lan+' --token '+INS.token+' --no-tailscale'+N,
+    vps:INS.ts?sh+' agent --hub '+INS.ts+' --hub-lan '+lan+' --token '+INS.token+N:'',
+    pve:'curl -fsSL '+raw+' | bash -s -- agent --hub '+lan+' --token '+INS.token+' --no-tailscale'+N,
+    gavm:S+'apt-get install -y qemu-guest-agent && '+S+'systemctl start qemu-guest-agent',
+    gahost:'qm set ID --agent enabled=1 && qm shutdown ID && qm start ID',
+    gachk:'qm agent ID ping && echo "guest agent odpowiada"',
+    harepo:'https://github.com/'+INS.repo,hahub:lan,hatok:INS.token,haname:nm||'haos',
+    del:sh+' uninstall-agent'};
+  for(const box of document.querySelectorAll('#addv .cmd')){
+    const t=C[box.dataset.k]||'';box.textContent='';
+    const c=el('code','',t),b=el('button','','Kopiuj');b.onclick=()=>copyText(t,b);box.append(c,b);
+  }
+}
+async function copyText(t,b){
+  let ok=false;
+  try{if(navigator.clipboard&&isSecureContext){await navigator.clipboard.writeText(t);ok=true}}catch{}
+  if(!ok){const ta=el('textarea');ta.value=t;ta.style.cssText='position:fixed;top:0;left:0;opacity:0';document.body.append(ta);ta.select();try{ok=document.execCommand('copy')}catch{}ta.remove()}
+  const o=b.textContent;b.textContent=ok?'Skopiowano':'Zaznacz ręcznie';setTimeout(()=>{b.textContent=o},1600);
+}
+$('#aname').oninput=renderAdd;$('#asudo').onchange=renderAdd;
+
 // ------------------------------------------------------------- strona statusu
 let SC={title:'',components:[],states:{}};
 async function loadStat(){
@@ -1503,6 +1597,7 @@ function pick(sel,meta,lvl,range,win){
   const rs=$('#range');let wo=rs.querySelector('option[value=win]');
   if(win){if(!wo){wo=new Option('','win');rs.append(wo)}wo.textContent=winLabel(win[0],win[1]);rs.value='win'}
   else{if(wo){wo.remove();if(!range)rs.value='1h'}if(range)rs.value=range}
+  syncDay();
   const t=$('#title');t.textContent='';
   const us=matching(),hh=meta.host?D.hosts.get(meta.host):null,st=meta.unit?(us[0]&&us[0].st):hh?(hh.up?(hh.bad.length?'bad':'up'):null):null;
   t.append(el('i',dotc(st)),el('b','',meta.title));
@@ -1579,11 +1674,13 @@ async function reload(){
   word=$('#q').value.trim();
   const lv=$('#lvl').value,rv=$('#range').value;
   if(rv!=='win'&&cur.win){cur.win=null;const wo=$('#range option[value=win]');if(wo)wo.remove()}
+  if(rv==='day')cur.win=dayWin();
   const win=cur.win;
   const q=cur.sel+' '+EXCL+(lv==='e'?' '+ERR:lv==='w'?' ('+ERR+' OR '+WARN+')':'')+(word?' ~'+quote('(?i)'+word.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')):'');
   try{
     status('Wczytuję…');
     const txt=await(await api('query',win?{query:q,start:iso(win[0]),end:iso(win[1]),limit:LIMIT}:{query:q+' _time:'+rv,limit:LIMIT},signal)).text();
+    if(signal.aborted)return;  // w miedzyczasie zmieniono zakres - nie mieszaj wynikow
     const rows=parseLines(txt).sort((a,b)=>a._time<b._time?-1:a._time>b._time?1:0);
     if(!rows.length)log.append(el('div','n','Brak logów w wybranym zakresie.'+(live&&!win?' Nowe linie pojawią się tutaj same.':'')));
     append(rows,true);
@@ -1644,7 +1741,7 @@ log.onscroll=()=>{
 for(const b of document.querySelectorAll('#nav button'))b.onclick=()=>{
   const g=b.dataset.go;
   if(g==='cron'){cronHost=null;renderCron();show(g);if(Date.now()-I.cronT>6e4)loadCron();return}
-  if(g==='over'||g==='notif'||g==='users'||g==='status')return show(g);
+  if(g==='over'||g==='notif'||g==='users'||g==='status'||g==='add')return show(g);
   pick(ALL,{title:g==='err'?'Błędy i ostrzeżenia':'Wszystkie logi',multi:true},g==='err'?'w':'',g==='err'?'1d':null);
 };
 for(const b of document.querySelectorAll('[data-tog]'))b.onclick=()=>document.body.classList.toggle('nos');
@@ -1661,7 +1758,20 @@ function setTheme(t){
 }
 {const ts=$('#theme');for(const [v,l] of THEMES)ts.append(new Option(l,v));ts.value=document.documentElement.dataset.theme||'';ts.onchange=()=>setTheme(ts.value)}
 $('#f').oninput=filterTree;
-$('#range').onchange=$('#lvl').onchange=reload;
+$('#range').onchange=()=>{syncDay();reload()};$('#lvl').onchange=reload;
+// logi z wybranego dnia (opcjonalnie zawezone do godzin); dzisiaj konczy sie na teraz
+const ymd=d=>d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate());
+function syncDay(){
+  const on=$('#range').value==='day';
+  for(const x of ['#day','#dfrom','#dto'])$(x).hidden=!on;
+  if(on){const t=ymd(new Date());$('#day').max=t;if(!$('#day').value)$('#day').value=t}
+}
+function dayWin(){
+  const d=$('#day').value||ymd(new Date()),a=new Date(d+'T'+($('#dfrom').value||'00:00')),b=new Date(d+'T'+($('#dto').value||'23:59'));
+  let from=+a,to=+b+6e4;if(to<=from)to=from+6e4;
+  return [from,Math.min(to,Date.now())];
+}
+for(const x of ['#day','#dfrom','#dto'])$(x).onchange=()=>{if($('#range').value==='day')reload()};
 let deb;$('#q').oninput=()=>{clearTimeout(deb);deb=setTimeout(reload,400)};
 $('#q').onkeydown=e=>{if(e.key==='Escape'){e.target.value='';reload()}};
 $('#live').onclick=()=>{live=!live;$('#live').setAttribute('aria-pressed',live);$('#live span').textContent=live?'Na żywo':'Wstrzymane';reload()};

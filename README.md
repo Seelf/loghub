@@ -120,6 +120,10 @@ Maszyny będące kontenerami LXC/VM Proxmoxa pokazują się w drzewie pod swoim 
 
 Na dole panelu bocznego jest wybór wyglądu: systemowy, ciemny, jasny oraz Apple ciemny i jasny (efekt szkła: półprzezroczyste, rozmyte karty i pływający pasek zakładek na spokojnym tle, kolory i kontrolki jak w macOS/iOS). Wybór zapamiętuje przeglądarka. Na telefonie panel boczny wysuwa się przyciskiem ☰ i chowa po wybraniu widoku.
 
+## Logi z wybranego dnia
+
+W widoku logów zakres „wybrany dzień…” pokazuje kalendarz i godziny od–do; wyszukiwarka i filtr poziomu działają w tym oknie. Pokazuje się do 1000 najnowszych linii z okna, więc przy dużym ruchu zawęź godziny albo wpisz szukane słowo.
+
 ## Zdarzenia zamiast liczby błędów
 
 Strona nie pokazuje surowej liczby linii z błędami, tylko zdarzenia. Zdarzenie to:
@@ -128,6 +132,10 @@ Strona nie pokazuje surowej liczby linii z błędami, tylko zdarzenia. Zdarzenie
 
 Zakładka Przegląd → Zdarzenia pokazuje pasek godzin albo dni (24 h, 7, 30, 90 dni); klik w dzień zawęża listę, a „Logi” otwiera błędy z okna danego zdarzenia.
 Źródła z błędami w co najmniej połowie godzin trafiają do sekcji „Stały szum” i można je wyciszyć (zapamiętuje to przeglądarka).
+
+## Dodawanie maszyn z panelu
+
+Panel → Dodaj maszynę (tylko administrator) pokazuje gotowe komendy z adresem centrali i tokenem: dla serwera w domowej sieci, VPS przez Tailscale, hosta Proxmoxa (host, LXC i VM naraz), kroki dla Home Assistant OS i komendę usunięcia agenta. Pole „Nazwa maszyny” dopisuje `--name` do komend.
 
 ## Maszyny wirtualne i Home Assistant OS
 
