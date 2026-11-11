@@ -116,6 +116,10 @@ pule ZFS, stan SMART fizycznych dysków (co 10 min, na maszynach fizycznych; age
 oraz nasłuchujące porty TCP/UDP z nazwą procesu i reguły zapory ufw otwarte na świat. Strona odświeża zasoby co 15 s.
 Maszyny będące kontenerami LXC/VM Proxmoxa pokazują się w drzewie pod swoim hostem (dopasowanie po nazwie).
 
+## Wygląd
+
+Na dole panelu bocznego jest wybór wyglądu: systemowy, ciemny, jasny oraz Apple ciemny i jasny (efekt szkła: półprzezroczyste, rozmyte karty i pływający pasek zakładek na spokojnym tle, kolory i kontrolki jak w macOS/iOS). Wybór zapamiętuje przeglądarka. Na telefonie panel boczny wysuwa się przyciskiem ☰ i chowa po wybraniu widoku.
+
 ## Zdarzenia zamiast liczby błędów
 
 Strona nie pokazuje surowej liczby linii z błędami, tylko zdarzenia. Zdarzenie to:
@@ -124,6 +128,15 @@ Strona nie pokazuje surowej liczby linii z błędami, tylko zdarzenia. Zdarzenie
 
 Zakładka Przegląd → Zdarzenia pokazuje pasek godzin albo dni (24 h, 7, 30, 90 dni); klik w dzień zawęża listę, a „Logi” otwiera błędy z okna danego zdarzenia.
 Źródła z błędami w co najmniej połowie godzin trafiają do sekcji „Stały szum” i można je wyciszyć (zapamiętuje to przeglądarka).
+
+## Maszyny wirtualne i Home Assistant OS
+
+Na hoście Proxmoxa ta sama komenda agenta przechodzi też po działających VM:
+- VM z Linuksem (apt) i włączonym QEMU Guest Agentem: agent instaluje się w środku przez `qm guest exec` (bez SSH), z nazwą taką jak nazwa VM, więc VM pojawia się w drzewie pod hostem,
+- VM bez guest agenta: skrypt wypisuje komendę do uruchomienia w środku,
+- Home Assistant OS nie ma powłoki, więc tam działa dodatek **loghub agent** z tego repozytorium. W HA: Ustawienia → Dodatki → Sklep z dodatkami → menu (⋮) → Repozytoria → `https://github.com/Seelf/loghub` → zainstaluj „loghub agent”. W konfiguracji ustaw `hub` (adres centrali w LAN), `token` i `name` (nazwa VM w Proxmoxie) i uruchom dodatek.
+
+Dodatek wysyła dziennik HAOS (Home Assistant, dodatki, system) i co ok. 20 s stan: CPU, RAM, dysk danych oraz to, czy Home Assistant (`homeassistant`) i dodatki (`addon_<nazwa>`) działają.
 
 ## Publiczna strona statusu
 

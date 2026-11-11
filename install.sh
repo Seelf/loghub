@@ -815,11 +815,51 @@ fan_out_lxc() {
     pct exec "$id" -- "$SELF" agent --hub "$HUB_LAN" --token "$TOKEN" \
       --no-lxc --no-tailscale $( [ "$DO_CRON" = 1 ] || echo --no-cron ) $( [ "$DO_STATUS" = 1 ] || echo --no-status ) </dev/null || warn "LXC $id: instalacja nieudana"
   done
-  local stopped vms
+  local stopped
   stopped="$(pct list 2>/dev/null | awk 'NR>1 && $2!="running" {printf "%s ", $1}')"
   [ -n "$stopped" ] && warn "Zatrzymane LXC pominiete: $stopped(uruchom skrypt ponownie po ich starcie)"
-  vms="$(qm list 2>/dev/null | awk 'NR>1 && $3=="running" {printf "%s(%s) ", $1, $2}')"
-  [ -n "$vms" ] && warn "VM-ki wymagaja uruchomienia tej samej komendy w srodku: $vms"
+  return 0
+}
+
+# Maszyny wirtualne: instalacja przez qemu-guest-agent (qm guest exec), bez SSH.
+# Home Assistant OS nie ma powloki - tam dziala dodatek "loghub agent" (katalog loghub-agent w repo).
+fan_out_vm() {
+  have qm || return 0
+  [ "$DO_LXC" = 1 ] || return 0
+  local id name os out flags=""
+  [ "$DO_CRON" = 1 ] || flags="$flags --no-cron"
+  [ "$DO_STATUS" = 1 ] || flags="$flags --no-status"
+  for id in $(qm list 2>/dev/null | awk 'NR>1 && $3=="running" {print $1}'); do
+    name="$(qm config "$id" 2>/dev/null | awk -F': ' '$1=="name"{print $2}')"
+    if ! timeout 15 qm agent "$id" ping >/dev/null 2>&1 </dev/null; then
+      warn "VM $id ($name): brak qemu-guest-agent. Wlacz go (Opcje VM -> QEMU Guest Agent, w srodku: apt install qemu-guest-agent) albo uruchom w VM:"
+      echo "    curl -fsSL $REPO_RAW/install.sh | sudo bash -s -- agent --hub $HUB_LAN --token $TOKEN --name $name --no-tailscale"
+      continue
+    fi
+    os="$(timeout 15 qm guest cmd "$id" get-osinfo 2>/dev/null </dev/null | tr -d '\n')"
+    if printf '%s' "$os" | grep -qiE '"id" *: *"(haos|hassos)"|Home Assistant'; then
+      say "VM $id ($name): Home Assistant OS - tu zainstaluj dodatek loghub agent:"
+      echo "    Ustawienia -> Dodatki -> Sklep -> menu (trzy kropki) -> Repozytoria -> dodaj https://github.com/$REPO"
+      echo "    potem zainstaluj 'loghub agent' i ustaw: hub $HUB_LAN, token $TOKEN, name $name"
+      continue
+    fi
+    out="$(timeout 30 qm guest exec "$id" --timeout 20 -- sh -c 'command -v apt-get' 2>/dev/null </dev/null || true)"
+    if ! printf '%s' "$out" | grep -qE '"exitcode" *: *0'; then
+      warn "VM $id ($name): system bez apt - pomijam (uruchom agenta recznie, jesli to Linux)"
+      continue
+    fi
+    say "VM $id ($name)"
+    out="$(timeout 1000 qm guest exec "$id" --timeout 900 -- bash -c "command -v curl >/dev/null || { apt-get update -qq && apt-get install -y -qq curl ca-certificates; }; curl -fsSL '$REPO_RAW/install.sh' | bash -s -- agent --hub '$HUB_LAN' --token '$TOKEN' --name '$name' --no-lxc --no-tailscale$flags" 2>&1 </dev/null || true)"
+    if printf '%s' "$out" | grep -qE '"exitcode" *: *0'; then
+      say "VM $id ($name): agent zainstalowany"
+    else
+      warn "VM $id ($name): instalacja nieudana. Koncowka wyniku:"
+      printf '%s\n' "$out" | tail -c 800 | sed 's/^/    /'
+    fi
+  done
+  local stopped
+  stopped="$(qm list 2>/dev/null | awk 'NR>1 && $3!="running" {printf "%s(%s) ", $1, $2}')"
+  [ -n "$stopped" ] && warn "Zatrzymane VM pominiete: $stopped"
   return 0
 }
 
@@ -895,6 +935,7 @@ cmd_agent() {
   fi
 
   fan_out_lxc
+  fan_out_vm
 }
 
 cmd_uninstall_agent() {

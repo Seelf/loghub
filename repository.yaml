@@ -1,0 +1,4 @@
+# Repozytorium dodatkow Home Assistant (dodatek "loghub agent" w katalogu loghub-agent)
+name: loghub
+url: https://github.com/Seelf/loghub
+maintainer: Seelf
