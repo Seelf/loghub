@@ -323,10 +323,20 @@ cmd_public() {
 
 # ------------------------------------------------------------------ agent
 
+# Vector dziala jako uzytkownik "vector". Zdolnosc CAP_DAC_READ_SEARCH pozwala mu czytac kazdy plik logu
+# (np. tylko dla roota: letsencrypt, dbconfig-common, katalog domowy TeamSpeaka), ale niczego nie zapisuje ani nie zmienia.
+setup_vector_access() {
+  mkdir -p /etc/systemd/system/vector.service.d
+  cat > /etc/systemd/system/vector.service.d/loghub.conf <<'EOF'
+[Service]
+AmbientCapabilities=CAP_DAC_READ_SEARCH
+EOF
+  systemctl daemon-reload
+}
+
 # Vector dziala jako uzytkownik "vector"; katalogi z logami spoza /var/log (np. TeamSpeak w /home/ts3) trzeba mu udostepnic do odczytu.
 grant_log_access() {
-  local dirs="" d p
-  dirs="$(find /opt /srv /home /root /usr/local -maxdepth 6 -type f -name 'ts3server_*.log' -printf '%h\n' 2>/dev/null | sort -u)"
+  local dirs="$TS3_DIRS" d p
   local IFS=','
   for p in $EXTRA_LOGS; do [ -n "$p" ] && dirs="$dirs"$'\n'"$(dirname "$p")"; done
   unset IFS
@@ -358,10 +368,6 @@ write_vector_config() {
     echo "    read_from: end"
     echo "    include:"
     echo "      - /var/log/**/*.log"
-    # logi znanych programow poza /var/log (TeamSpeak 3)
-    find /opt /srv /home /root /usr/local -maxdepth 6 -type f -name 'ts3server_*.log' -printf '%h\n' 2>/dev/null | sort -u | while read -r d; do
-      echo "      - \"$d/*.log\""
-    done
     local IFS=','
     for p in $EXTRA_LOGS; do
       [ -n "$p" ] && echo "      - \"$p\""
@@ -369,6 +375,15 @@ write_vector_config() {
     unset IFS
     echo "    exclude:"
     echo "      - /var/log/journal/**"
+    # TeamSpeak 3: osobne zrodlo, czytane od poczatku biezacych plikow (z ostatnich 7 dni), z czasem z linii logu
+    if [ -n "$TS3_DIRS" ]; then
+      echo "  ts3:"
+      echo "    type: file"
+      echo "    read_from: beginning"
+      echo "    ignore_older_secs: 604800"
+      echo "    include:"
+      while read -r d; do echo "      - \"$d/ts3server_*.log\""; done <<< "$TS3_DIRS"
+    fi
     if [ -S /var/run/docker.sock ]; then
       echo "  docker:"
       echo "    type: docker_logs"
@@ -409,6 +424,35 @@ EOF
 EOF
       fi
       echo "      . = out"
+    fi
+    if [ -n "$TS3_DIRS" ]; then
+      inputs="${inputs:+$inputs, }t_ts3"
+      if [ "$TS3_PARSE" = 1 ]; then cat <<EOF
+  t_ts3:
+    type: remap
+    inputs: [ts3]
+    source: |
+      msg = string(.message) ?? ""
+      ts = .timestamp
+      lvl = ""
+      p, err = parse_regex(msg, r'^(?P<t>[0-9]{4}-[0-9]{2}-[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2}(\.[0-9]+)?)\|(?P<l>[A-Z]+) *\|(?P<r>.*)\$')
+      if err == null {
+        t2, e2 = parse_timestamp(string!(p.t), "%Y-%m-%d %H:%M:%S%.f")
+        if e2 == null { ts = t2 }
+        l = string!(p.l)
+        lvl = if l == "ERROR" || l == "CRITICAL" { "3" } else if l == "WARNING" { "4" } else if l == "INFO" { "6" } else { "7" }
+        msg = l + " |" + string!(p.r)
+      }
+      . = {"host": "$NAME", "source": "file", "unit": "teamspeak", "level": lvl, "message": msg, "timestamp": ts}
+EOF
+      else cat <<EOF
+  t_ts3:
+    type: remap
+    inputs: [ts3]
+    source: |
+      . = {"host": "$NAME", "source": "file", "unit": "teamspeak", "message": string(.message) ?? "", "timestamp": .timestamp}
+EOF
+      fi
     fi
     inputs="${inputs:+$inputs, }t_files"
     cat <<EOF
@@ -789,10 +833,20 @@ cmd_agent() {
 
   setup_cron
   setup_status
+  # aktywne katalogi z logami TeamSpeak 3 (pliki zmieniane w ostatnich 30 dniach; stare kopie pomijamy)
+  TS3_DIRS="$(find /opt /srv /home /root /usr/local /var/lib -maxdepth 6 -type f -name 'ts3server_*.log' -mtime -30 -printf '%h\n' 2>/dev/null | sort -u)"
+  TS3_PARSE=1
+  [ -n "$TS3_DIRS" ] && say "Logi TeamSpeak 3: $(echo "$TS3_DIRS" | paste -sd' ' -)"
   grant_log_access
+  setup_vector_access
   write_vector_config
+  # dodatki nie moga zablokowac zbierania zwyklych logow: przy bledzie wylaczamy je po kolei
+  if [ -n "$TS3_DIRS" ] && ! vector validate --no-environment /etc/vector/vector.yaml >/dev/null 2>&1; then
+    warn "$NAME: konfiguracja z rozbiorem logow TeamSpeak nie przeszla walidacji - zbieram je bez rozbioru"
+    TS3_PARSE=0
+    write_vector_config
+  fi
   if [ "$JSON_VRL" = 1 ] && ! vector validate --no-environment /etc/vector/vector.yaml >/dev/null 2>&1; then
-    # czesc dla crona i zasobow nie moze zablokowac zbierania zwyklych logow
     warn "$NAME: konfiguracja z cronem i zasobami nie przeszla walidacji - instaluje bez niej"
     JSON_VRL=0
     write_vector_config
@@ -818,7 +872,7 @@ cmd_uninstall_agent() {
   need_root
   systemctl disable --now vector >/dev/null 2>&1 || true
   apt-get remove -y -qq vector >/dev/null 2>&1 || true
-  rm -rf /etc/vector/vector.yaml /var/lib/vector
+  rm -rf /etc/vector/vector.yaml /var/lib/vector /etc/systemd/system/vector.service.d/loghub.conf
   systemctl disable --now loghub-cron loghub-status >/dev/null 2>&1 || true
   rm -rf /etc/systemd/system/loghub-cron.service /etc/systemd/system/loghub-status.service "$CRON_LIB"
   if [ -f /etc/default/cron ] && grep -q '^# loghub$' /etc/default/cron; then
