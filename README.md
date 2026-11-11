@@ -99,6 +99,18 @@ Usługa `loghub-status` co minutę wysyła CPU, RAM, dysk i obciążenie maszyny
 (z `docker stats`), stan usług systemd, a na hoście Proxmox także listę kontenerów LXC i VM z ich zużyciem.
 Na stronie: kolorowe kropki (działa / zatrzymane / padło), wskaźniki na kartach serwerów i zakładka Zasoby.
 
+## Stan, zasoby i drzewo maszyn
+
+Usługa `loghub-status` co ok. 20 s wysyła CPU, RAM, dysk, obciążenie, stan kontenerów Dockera i usług systemd,
+a na hoście Proxmox także listę LXC i VM z ich zużyciem. Strona odświeża zasoby co 15 s.
+Maszyny będące kontenerami LXC/VM Proxmoxa pokazują się w drzewie pod swoim hostem (dopasowanie po nazwie).
+
+## Powiadomienia
+
+Usługa `notify` na centrali co minutę sprawdza: brak kontaktu z maszyną, padnięte kontenery i usługi, błędy
+zadań cron, zapełniony dysk, wysokie CPU i RAM, nagły wysyp błędów w logach. Kanały: ntfy, Telegram, Discord,
+webhook, e-mail. Ustawienia: zakładka Powiadomienia (tylko administrator).
+
 ## Zadania cron
 
 Agent ustawia cronowi opcję `-L 15` (w `/etc/default/cron`), dzięki której cron zapisuje koniec i kod wyjścia
@@ -123,5 +135,6 @@ proxmox.sh            tworzy kontener LXC z centralą na Proxmoxie
 hub/www/index.html    strona
 hub/www/demo.js       przykładowe dane dla ?demo
 hub/auth/auth.py      logowanie, 2FA, konta
+hub/notify/notify.py  powiadomienia
 docs/                 diagram
 ```

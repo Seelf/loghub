@@ -66,6 +66,10 @@ aside .lbl{padding:10px 14px 4px}
 summary{display:flex;align-items:center;gap:8px;cursor:pointer;padding:5px 14px;font-weight:600;list-style:none}
 summary::-webkit-details-marker{display:none}
 summary small,.it small{margin-left:auto;font-weight:400;color:var(--mut);font-variant-numeric:tabular-nums}
+details details{margin-left:14px;border-left:1px solid var(--line)}
+details details summary{padding-left:10px}
+.it.ghost{cursor:default;color:var(--mut)}
+.it.ghost:hover{background:none}
 .grp{padding:5px 14px 1px 30px;color:var(--mut);font-size:10px;text-transform:uppercase;letter-spacing:.07em}
 .it{display:flex;align-items:center;gap:8px;padding:3px 14px 3px 27px;cursor:pointer;white-space:nowrap;border-left:3px solid transparent}
 .it span{overflow:hidden;text-overflow:ellipsis}
@@ -116,6 +120,30 @@ main{flex:1;min-width:0;display:flex;flex-direction:column}
 .vol span{font-variant-numeric:tabular-nums;width:44px;flex:none;text-align:right}
 #errs{border:1px solid var(--line);border-radius:12px;background:var(--card);padding:6px 0;font:12px/1.55 var(--mono)}
 #errs .r{cursor:pointer}
+#notv{flex:1;overflow:auto;padding:18px 22px 28px;display:flex;flex-direction:column;gap:14px}
+#notv>header{display:flex;align-items:flex-start;gap:10px}
+#notv>*,#cronv>*,#over>*{flex:none}
+.nlist{border:1px solid var(--line);border-radius:12px;background:var(--card);overflow:hidden}
+.al{display:flex;gap:12px;align-items:flex-start;padding:10px 14px;border-bottom:1px solid var(--line);border-left:3px solid var(--line)}
+.al:last-child{border-bottom:0}
+.al.error{border-left-color:var(--err)}.al.warn{border-left-color:var(--warn)}.al.ok{border-left-color:var(--acc)}
+.al>div{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
+.al b{font-weight:600}
+.al small{color:var(--mut)}
+.al.click{cursor:pointer}.al.click:hover{background:var(--sel)}
+.al time{color:var(--mut);font-size:12px;white-space:nowrap}
+.panel{border:1px solid var(--line);border-radius:12px;background:var(--card);padding:14px;display:flex;flex-direction:column;gap:12px}
+.panel h2{font-size:15px;margin:0;font-weight:600}
+.rule{display:grid;grid-template-columns:24px minmax(180px,1fr) auto;gap:10px;align-items:center}
+.rule .nums{display:flex;gap:8px;flex-wrap:wrap;align-items:center;color:var(--mut);font-size:12px}
+.rule input[type=number]{width:72px}
+.chn{border:1px solid var(--line);border-radius:10px;padding:10px;display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:8px;align-items:end}
+.chn label{display:flex;flex-direction:column;gap:3px;font-size:12px;color:var(--mut)}
+.chn .top{grid-column:1/-1;display:flex;align-items:center;gap:10px}
+.chn .top b{flex:1}
+.acts{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.acts .pri{background:var(--acc);border-color:var(--acc);color:var(--bg);font-weight:600}
+#nmsg{font-size:12px}
 .meters{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
 .mt{display:flex;flex-direction:column;gap:3px;min-width:0}
 .mt .row b{font-size:15px;font-variant-numeric:tabular-nums;margin-left:auto}
@@ -179,7 +207,7 @@ mark{background:var(--hl);color:inherit;border-radius:2px}
 #jump{position:absolute;right:22px;bottom:16px;background:var(--acc);color:var(--bg);border-color:var(--acc);border-radius:8px;padding:8px 12px;font-weight:600}
 #st{display:flex;gap:12px;padding:4px 14px;border-top:1px solid var(--line);color:var(--mut);font-size:11px}
 #st a{color:inherit;margin-left:auto}
-@media(max-width:760px){#app{flex-direction:column}aside{width:auto;max-height:42%;border-right:0;border-bottom:1px solid var(--line)}#over,#cronv{padding:14px 16px}.kv{grid-template-columns:repeat(2,1fr)}.stat .sp{width:70px}}
+@media(max-width:760px){#app{flex-direction:column}aside{width:auto;max-height:42%;border-right:0;border-bottom:1px solid var(--line)}#over,#cronv,#notv{padding:14px 16px}.rule{grid-template-columns:24px 1fr}.rule .nums{grid-column:2}.kv{grid-template-columns:repeat(2,1fr)}.stat .sp{width:70px}}
 </style>
 </head>
 <body>
@@ -211,6 +239,7 @@ mark{background:var(--hl);color:inherit;border-radius:2px}
     <button data-go="all">Wszystkie logi</button>
     <button data-go="err">Błędy i ostrzeżenia<small class="chip bad" id="nerr" hidden></small></button>
     <button data-go="cron">Zadania cron<small class="chip bad" id="ncron" hidden></small></button>
+    <button data-go="notif">Powiadomienia<small class="chip bad" id="nnot" hidden></small></button>
   </div>
   <div class="lbl">Serwery</div>
   <input id="f" placeholder="filtruj źródła (Ctrl K)" aria-label="Filtruj źródła">
@@ -220,7 +249,7 @@ mark{background:var(--hl);color:inherit;border-radius:2px}
 
 <main>
   <section id="over">
-    <header><button class="tog" data-tog title="Pokaż lub ukryj panel">☰</button><div><h1>Przegląd</h1><div class="mut">Stan serwerów i źródeł logów z ostatnich 24 godzin.</div></div></header>
+    <header><button class="tog" data-tog title="Pokaż lub ukryj panel">☰</button><div><h1>Przegląd</h1><div class="mut" id="osub">Stan serwerów i źródeł logów z ostatnich 24 godzin.</div></div></header>
     <div id="tiles" class="tiles"></div>
     <div id="tabs"><button data-tab="hosts" class="on">Serwery</button><button data-tab="units">Źródła</button><button data-tab="res">Zasoby</button><button data-tab="errs">Ostatnie błędy</button></div>
     <div id="cards"></div>
@@ -244,13 +273,43 @@ mark{background:var(--hl);color:inherit;border-radius:2px}
   </section>
 
   <section id="cronv" hidden>
-    <header><button class="tog" data-tog title="Pokaż lub ukryj panel">☰</button><div><h1>Zadania cron</h1><div class="mut">Ostatnie uruchomienia, kody wyjścia i harmonogramy ze wszystkich maszyn.</div></div></header>
+    <header><button class="tog" data-tog title="Pokaż lub ukryj panel">☰</button><div><h1 id="ctitle">Zadania cron</h1><div class="mut" id="csub">Ostatnie uruchomienia, kody wyjścia i harmonogramy ze wszystkich maszyn.</div></div></header>
     <div id="ctiles" class="tiles"></div>
     <div id="ctools">
       <input id="cs" placeholder="szukaj zadania lub serwera" aria-label="Szukaj zadania">
       <select id="cf" aria-label="Pokaż"><option value="">wszystkie zadania</option><option value="bad">tylko z błędem</option><option value="never">jeszcze nie uruchomione</option></select>
     </div>
     <div id="ctbl"></div>
+  </section>
+
+  <section id="notv" hidden>
+    <header><button class="tog" data-tog title="Pokaż lub ukryj panel">☰</button><div><h1>Powiadomienia</h1><div class="mut" id="nsub">Centrala sprawdza stan maszyn co minutę i wysyła powiadomienia na ustawione kanały.</div></div></header>
+    <div class="lbl">Aktywne problemy</div>
+    <div id="nact" class="nlist"></div>
+    <div id="nset" hidden>
+      <div class="panel">
+        <h2>Kiedy powiadamiać</h2>
+        <div id="nrules" style="display:flex;flex-direction:column;gap:8px"></div>
+        <div class="acts">
+          <label><input type="checkbox" id="nres"> powiadom też, gdy problem minie</label>
+          <label>przypominaj co <input type="number" id="nrep" min="0" max="168" style="width:64px"> godz. (0 = nie)</label>
+        </div>
+      </div>
+      <div class="panel" style="margin-top:12px">
+        <h2>Gdzie wysyłać</h2>
+        <div id="nchs" style="display:flex;flex-direction:column;gap:10px"></div>
+        <div class="acts">
+          <select id="nadd" aria-label="Dodaj kanał"><option value="">+ dodaj kanał…</option><option value="ntfy">ntfy (aplikacja na telefon)</option><option value="telegram">Telegram</option><option value="discord">Discord</option><option value="webhook">Webhook</option><option value="email">E-mail</option></select>
+        </div>
+      </div>
+      <div class="acts" style="margin-top:12px">
+        <button class="pri" id="nsave">Zapisz ustawienia</button>
+        <button id="ntest">Wyślij wiadomość testową</button>
+        <span id="nmsg" role="status"></span>
+      </div>
+    </div>
+    <div class="lbl">Historia</div>
+    <div id="nhist" class="nlist"></div>
   </section>
 
   <section id="logs" hidden>
@@ -285,7 +344,7 @@ const SRC={journald:'systemd',docker:'docker',file:'pliki',cron:'cron'};
 // rekordy techniczne agenta (stan i zasoby, lista zadan cron) nie sa zwyklymi logami
 const EXCL='NOT source:=stat NOT source:=crondef';
 const log=$('#log'),tree=$('#tree'),jump=$('#jump'),pos=$('#pos'),demo=()=>window.loghubDemo;
-let me=null,D={units:[],hosts:new Map(),stat:new Map(),hist:new Map()},C=[],cur=null,ctl=null,live=true,seen=new Set(),fresh=0,word='',view='over',tab='hosts',started=false;
+window.C_ALL=[];let cronHost=null,me=null,D={units:[],hosts:new Map(),stat:new Map(),hist:new Map()},C=[],cur=null,ctl=null,live=true,seen=new Set(),fresh=0,word='',view='over',tab='hosts',started=false;
 
 const quote=v=>JSON.stringify(String(v));
 const short=u=>String(u||'').replace(/^\/var\/log\//,'').replace(/\.service$/,'');
@@ -333,8 +392,8 @@ function enter(u){
   me=u;$('#login').hidden=true;$('#app').hidden=false;
   $('#who').textContent=u.user;$('#role').textContent=u.role==='admin'?'administrator':'oglądający';
   if(demo()){$('#demo').hidden=false;$('#adv').hidden=true}
-  if(!started){started=true;setInterval(refresh,6e4);setInterval(()=>{if(me&&view==='logs')headStats()},3e4)}
-  show(view);refresh();
+  if(!started){started=true;setInterval(refresh,6e4);setInterval(()=>{if(me&&view==='logs')headStats()},3e4);setInterval(pollStat,15e3);setInterval(loadNotif,3e4)}
+  show(view);refresh();loadNotif();
 }
 $('#lf').onsubmit=async e=>{
   e.preventDefault();$('#lgo').disabled=true;$('#lerr').textContent='';
@@ -448,6 +507,20 @@ function meter(label,v,sub){
   i.style.width=Math.min(100,Math.max(0,v||0))+'%';b.append(i);
   r.append(el('span','lbl',label),el('b','',pc(v)));const s=el('small','',sub||'');s.title=sub||'';m.append(r,b,s);return m;
 }
+// zasoby i stan na zywo: agenci mierza co ok. 20 s, strona pyta co 15 s
+async function pollStat(){
+  if(!me||document.hidden)return;
+  try{
+    D.stat=readStat(parseLines(await(await api('query',{query:'{source="stat"} _time:10m',limit:500})).text()));
+    const now=Date.now();
+    for(const u of D.units)[u.st,u.stt]=ustate(u);
+    for(const h of D.hosts.values()){h.bad=h.units.filter(u=>u.st==='bad');const s=D.stat.get(h.name);if(s){h.up=now-s.t<3*6e4;h.last=Math.max(h.last,s.t)}}
+    const sc=tree.scrollTop;renderTree();tree.scrollTop=sc;
+    if(view==='over')renderOver(true);
+    if(view==='logs')resBox();
+  }catch{}
+}
+
 // srednie CPU i RAM z ostatnich 24 h, w kubelkach po 30 min
 async function loadHist(){
   try{
@@ -493,23 +566,58 @@ function item(label,sel,meta,u){
   it.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();it.onclick()}};
   return it;
 }
+// maszyna matka: host Proxmoxa, ktorego lista gosci (LXC/VM) zawiera nazwe innej maszyny z agentem
+function linkParents(){
+  const by=new Map();
+  for(const [host,s] of D.stat)for(const g of s.guests)if(g.name&&g.name!==host)by.set(g.name,{parent:host,g});
+  for(const h of D.hosts.values()){const x=by.get(h.name);h.parent=x&&D.hosts.has(x.parent)?x.parent:null;h.guest=x?x.g:null}
+}
+const kids=name=>[...D.hosts.values()].filter(h=>h.parent===name).sort((a,b)=>a.name.localeCompare(b.name));
+const family=name=>[name,...kids(name).flatMap(k=>family(k.name))];
+function hostNode(h,open,first){
+  const d=el('details');d.dataset.h=h.name;d.open=open.has(h.name);
+  const sm=el('summary'),dot=el('i','dot'+(h.up?(h.bad.length?' bad':' up'):''));dot.title=h.up?(h.bad.length?h.bad.length+' usług z problemem':'agent działa'):'brak kontaktu z agentem';
+  const s=D.stat.get(h.name),lab=el('span','',h.name);lab.style.overflow='hidden';lab.style.textOverflow='ellipsis';
+  sm.append(dot,lab);
+  if(h.guest)sm.append(el('span','chip',(h.guest.type==='qemu'?'VM ':'LXC ')+(h.guest.vmid||'')));
+  sm.append(el('small','',s?'CPU '+pc(s.cpu):num(h.c24)));
+  if(s)sm.title='CPU '+pc(s.cpu)+' · RAM '+pc(s.mem)+' · dysk '+pc(s.disk);
+  d.append(sm);
+  d.append(item('cały serwer','{host='+quote(h.name)+'}',{k:h.name.toLowerCase(),title:h.name,host:h.name,multi:true}));
+  // zadania cron tej maszyny (dla maszyny matki: razem z jej kontenerami)
+  const fam=family(h.name),cj=C.filter(j=>fam.includes(j.host)),cb=cj.filter(j=>j.bad).length;
+  if(cj.length){
+    const it=el('div','it');it.tabIndex=0;it.setAttribute('role','button');it.dataset.k=(h.name+' cron').toLowerCase();it.dataset.sel='cron:'+h.name;
+    it.append(el('span','','zadania cron'));if(cb)it.append(el('span','chip bad',cb));it.append(el('small','',cj.length));
+    it.onclick=()=>showCron(h.name);it.onkeydown=e=>{if(e.key==='Enter')it.onclick()};
+    d.append(it);
+  }
+  for(const src of [...new Set(h.units.map(u=>u.source))].filter(x=>x!=='cron').sort()){
+    d.append(el('div','grp',SRC[src]||src));
+    for(const u of h.units.filter(u=>u.source===src).sort((a,b)=>a.unit.localeCompare(b.unit)))
+      d.append(item(short(u.unit),u.sel,{k:(u.host+' '+src+' '+u.unit).toLowerCase(),title:short(u.unit),host:u.host,source:src,unit:u.unit},u));
+  }
+  // goscie Proxmoxa: z agentem jako zagniezdzone maszyny, bez agenta jako sam stan
+  const ks=kids(h.name),withAgent=new Set(ks.map(k=>k.name)),bare=s?s.guests.filter(g=>!withAgent.has(g.name)):[];
+  if(ks.length||bare.length){
+    d.append(el('div','grp','LXC i VM'));
+    for(const k of ks)d.append(hostNode(k,open,first));
+    for(const g of bare.sort((a,b)=>String(a.name).localeCompare(String(b.name)))){
+      const on=g.status==='running',it=el('div','it ghost');it.dataset.k=(h.name+' '+g.name).toLowerCase();
+      const dt=el('i','dot'+(on?' up':''));dt.title=g.status||'';
+      it.append(dt,el('span','',(g.name||g.id)+' · '+(g.type==='qemu'?'VM':'LXC')),el('small','',on?pc((g.cpu||0)*100):'stop'));
+      it.title='bez agenta loghub: widać tylko stan i zużycie z Proxmoxa';d.append(it);
+    }
+  }
+  return d;
+}
 function renderTree(){
   const open=new Set([...tree.querySelectorAll('details[open]')].map(d=>d.dataset.h)),first=!tree.children.length;
+  linkParents();
   tree.textContent='';
-  for(const h of [...D.hosts.values()].sort((a,b)=>a.name.localeCompare(b.name))){
-    const d=el('details');d.dataset.h=h.name;d.open=first||open.has(h.name);
-    const sm=el('summary'),dot=el('i','dot'+(h.up?(h.bad.length?' bad':' up'):''));dot.title=h.up?(h.bad.length?h.bad.length+' usług z problemem':'agent działa'):'brak kontaktu z agentem';
-    sm.append(dot,h.name,el('small','',num(h.c24)));d.append(sm);
-    d.append(item('cały serwer','{host='+quote(h.name)+'}',{k:h.name.toLowerCase(),title:h.name,host:h.name,multi:true}));
-    for(const src of [...new Set(h.units.map(u=>u.source))].sort()){
-      d.append(el('div','grp',SRC[src]||src));
-      for(const u of h.units.filter(u=>u.source===src).sort((a,b)=>a.unit.localeCompare(b.unit)))
-        d.append(item(short(u.unit),u.sel,{k:(u.host+' '+src+' '+u.unit).toLowerCase(),title:short(u.unit),host:u.host,source:src,unit:u.unit},u));
-    }
-    tree.append(d);
-  }
+  for(const h of [...D.hosts.values()].filter(h=>!h.parent).sort((a,b)=>a.name.localeCompare(b.name)))tree.append(hostNode(h,open,first));
   const e=sum(D.units.map(u=>u.e24));$('#nerr').hidden=!e;$('#nerr').textContent=num(e);
-  filterTree();
+  filterTree();marks();
 }
 function filterTree(){
   const t=$('#f').value.trim().toLowerCase();
@@ -517,14 +625,14 @@ function filterTree(){
   for(const d of tree.querySelectorAll('details')){d.hidden=!!t&&!d.querySelector('.it:not([hidden])');if(t&&!d.hidden)d.open=true}
 }
 function marks(){
-  for(const x of tree.querySelectorAll('.it'))x.classList.toggle('on',view==='logs'&&!!cur&&x.dataset.sel===cur.sel);
-  const k=view!=='logs'?view:cur&&cur.sel===ALL?($('#lvl').value?'err':'all'):'';
+  for(const x of tree.querySelectorAll('.it'))x.classList.toggle('on',(view==='logs'&&!!cur&&x.dataset.sel===cur.sel)||(view==='cron'&&!!cronHost&&x.dataset.sel==='cron:'+cronHost));
+  const k=view==='cron'&&cronHost?'':view!=='logs'?view:cur&&cur.sel===ALL?($('#lvl').value?'err':'all'):'';
   for(const b of document.querySelectorAll('#nav button'))b.classList.toggle('on',b.dataset.go===k);
 }
-function show(v){view=v;$('#over').hidden=v!=='over';$('#logs').hidden=v!=='logs';$('#cronv').hidden=v!=='cron';marks()}
+function show(v){view=v;$('#over').hidden=v!=='over';$('#logs').hidden=v!=='logs';$('#cronv').hidden=v!=='cron';$('#notv').hidden=v!=='notif';marks();if(v==='notif')loadNotif(true)}
 
 // -------------------------------------------------------------------- przeglad
-function renderOver(){
+function renderOver(light){
   const hs=[...D.hosts.values()],us=D.units,upH=hs.filter(h=>h.up).length,bad=us.filter(u=>u.st==='bad').length,e=sum(us.map(u=>u.e24)),w=sum(us.map(u=>u.w24));
   const tiles=$('#tiles');tiles.textContent='';
   for(const [v,l,c] of [[num(sum(us.map(u=>u.c24))),'linii w 24 h',''],[num(e),'błędów',e?'e':''],[num(w),'ostrzeżeń',w?'w':''],[upH+' / '+hs.length,'serwerów online',upH<hs.length?'w':'g'],[bad,'usług z problemem',bad?'e':'g']]){
@@ -573,7 +681,9 @@ function renderOver(){
     ft.append(b1,b2);c.append(hd,...res,r,sp,types,kv,ft);cards.append(c);
   }
   renderUnits();renderRes();
-  if(tab==='errs')loadErrs();
+  const lt=Math.max(0,...[...D.stat.values()].map(s=>s.t));
+  $('#osub').textContent='Stan serwerów i logi z ostatnich 24 godzin.'+(lt?' Zasoby odświeżane na bieżąco, ostatni pomiar '+rel(lt)+'.':'');
+  if(tab==='errs'&&!light)loadErrs();
 }
 function renderUnits(){
   const t=$('#us').value.trim().toLowerCase(),by=$('#usort').value,dir=+$('#udir').value,tbl=$('#tbl');
@@ -640,6 +750,91 @@ function renderRes(){
 }
 $('#rs').oninput=$('#rsort').onchange=$('#rtype').onchange=renderRes;
 
+// ------------------------------------------------------------------ powiadomienia
+async function napi(path,method,body){
+  if(demo())return demo().notify(path,method,body);
+  const r=await fetch('/api/notify/'+path,{method:method||'GET',headers:body?{'Content-Type':'application/json'}:{},body:body?JSON.stringify(body):undefined});
+  if(r.status===401){showLogin('Sesja wygasła. Zaloguj się ponownie.');throw new Error('sesja wygasła')}
+  const d=await r.json().catch(()=>({}));
+  if(!r.ok)throw new Error(d.error||('błąd '+r.status));
+  return d;
+}
+const RULES=[['host_offline','Serwer bez kontaktu z centralą',[['minutes','po',' min']]],['service_down','Padnięty kontener Dockera lub usługa systemd',[]],['cron_failed','Zadanie cron zakończone błędem',[]],
+  ['disk','Zapełniony dysk',[['pct','od','%']]],['cpu','Wysokie CPU',[['pct','od','%'],['minutes','średnio przez',' min']]],['mem','Wysoki RAM',[['pct','od','%'],['minutes','średnio przez',' min']]],
+  ['errors','Dużo błędów w logach jednego źródła',[['count','od',' błędów'],['minutes','w ciągu',' min']]]];
+const CHT={ntfy:['ntfy',[['url','Adres tematu, np. https://ntfy.sh/twoj-temat'],['token','Token (opcjonalnie)']]],telegram:['Telegram',[['bot_token','Token bota (od @BotFather)'],['chat_id','Chat ID']]],
+  discord:['Discord',[['url','Adres webhooka kanału']]],webhook:['Webhook',[['url','Adres (POST z JSON)']]],email:['E-mail',[['host','Serwer SMTP'],['port','Port (587 albo 465)'],['user','Login'],['password','Hasło'],['from','Nadawca'],['to','Odbiorca']]]};
+let NC=null,ndirty=false;
+function alertRow(a,hist){
+  const r=el('div','al '+(hist&&a.kind!=='cron_failed'?'ok':a.sev||'error')),d=el('div');
+  d.append(el('b','',a.title));if(a.detail)d.append(el('small','',a.detail));
+  const t=el('time','',hist?(a.kind==='cron_failed'?rel(a.since*1e3):'minęło '+rel(a.until*1e3)+(a.since?' · trwało '+dur(Math.max(60,a.until-a.since)):'')):'od '+rel(a.since*1e3).replace(' temu',''));
+  r.append(d,t);
+  if(a.host&&D.hosts.has(a.host)){
+    r.classList.add('click');r.tabIndex=0;
+    const u=D.units.find(x=>x.host===a.host&&x.unit===a.unit);
+    r.onclick=()=>u?pick(u.sel,{title:short(u.unit),host:u.host,source:u.source,unit:u.unit},''):pick('{host='+quote(a.host)+'}',{title:a.host,host:a.host,multi:true},'');
+    r.onkeydown=x=>{if(x.key==='Enter')r.onclick()};
+  }
+  return r;
+}
+async function loadNotif(full){
+  if(!me)return;
+  try{
+    const s=await napi('state');
+    const n=s.active.length;$('#nnot').hidden=!n;$('#nnot').textContent=n;
+    if(view!=='notif')return;
+    const act=$('#nact'),hist=$('#nhist');act.textContent='';hist.textContent='';
+    for(const a of s.active)act.append(alertRow(a,false));
+    if(!n)act.append(el('div','n','Brak aktywnych problemów.'));
+    for(const a of s.history.slice(0,60))hist.append(alertRow(a,true));
+    if(!s.history.length)hist.append(el('div','n','Jeszcze nic się nie wydarzyło.'));
+    $('#nsub').textContent=(s.error?s.error+' ':'')+'Ostatnie sprawdzenie: '+(s.checked_at?rel(s.checked_at*1e3):'jeszcze nie było')+'. '+(s.channels?'Kanały powiadomień: '+s.channels+'.':'Nie ustawiono żadnego kanału, więc powiadomienia widać tylko tutaj.');
+    if(me.role==='admin'&&full&&!ndirty){NC=await napi('config');renderNset()}
+    $('#nset').hidden=me.role!=='admin';
+  }catch(e){if(view==='notif')$('#nsub').textContent='Nie udało się wczytać powiadomień: '+e.message}
+}
+function renderNset(){
+  const box=$('#nrules');box.textContent='';
+  for(const [k,label,fields] of RULES){
+    const r=NC.rules[k],row=el('div','rule'),cb=el('input');cb.type='checkbox';cb.checked=r.on;cb.id='r_'+k;cb.onchange=()=>{r.on=cb.checked;ndirty=true};
+    const lb=el('label','',label);lb.htmlFor=cb.id;const nums=el('span','nums');
+    for(const [f,pre,post] of fields){const i=el('input');i.type='number';i.min=1;i.value=r[f];i.setAttribute('aria-label',label+' '+pre);i.oninput=()=>{r[f]=+i.value||1;ndirty=true};nums.append(el('span','',pre),i,el('span','',post.trim()))}
+    row.append(cb,lb,nums);box.append(row);
+  }
+  $('#nres').checked=NC.notify_resolved;$('#nrep').value=NC.repeat_hours;
+  const chs=$('#nchs');chs.textContent='';
+  NC.channels.forEach((c,ix)=>{
+    const [nm,fields]=CHT[c.type],w=el('div','chn'),top=el('div','top'),on=el('input'),del=el('button','','Usuń');
+    on.type='checkbox';on.checked=c.on!==false;on.title='włączony';on.onchange=()=>{c.on=on.checked;ndirty=true};
+    del.onclick=()=>{NC.channels.splice(ix,1);ndirty=true;renderNset()};
+    const name=el('input');name.placeholder='nazwa (opcjonalnie)';name.value=c.name||'';name.oninput=()=>{c.name=name.value;ndirty=true};
+    top.append(on,el('b','',nm),name,del);w.append(top);
+    for(const [f,label] of fields){
+      const l=el('label','',label),i=el('input');i.value=c[f]||'';if(/token|password/.test(f))i.type='password';i.autocomplete='off';
+      i.oninput=()=>{c[f]=i.value;ndirty=true};l.append(i);w.append(l);
+    }
+    chs.append(w);
+  });
+  if(!NC.channels.length)chs.append(el('div','mut','Brak kanałów. Najprościej: ntfy, czyli darmowa aplikacja na telefon (ntfy.sh); wymyśl nazwę tematu i wpisz ją tutaj i w aplikacji.'));
+}
+$('#nadd').onchange=e=>{const t=e.target.value;if(!t)return;NC.channels.push({type:t,on:true});e.target.value='';ndirty=true;renderNset()};
+$('#nres').onchange=e=>{NC.notify_resolved=e.target.checked;ndirty=true};
+$('#nrep').oninput=e=>{NC.repeat_hours=+e.target.value||0;ndirty=true};
+$('#nsave').onclick=async()=>{
+  const m=$('#nmsg');m.style.color='';m.textContent='Zapisuję…';
+  try{NC=await napi('config','PUT',NC);ndirty=false;renderNset();m.style.color='var(--acc)';m.textContent='Zapisano.';loadNotif()}
+  catch(e){m.style.color='var(--err)';m.textContent='Nie zapisano: '+e.message}
+};
+$('#ntest').onclick=async()=>{
+  const m=$('#nmsg');m.style.color='';
+  if(ndirty){m.style.color='var(--warn)';m.textContent='Najpierw zapisz ustawienia.';return}
+  m.textContent='Wysyłam…';
+  try{const r=await napi('test','POST',{});m.style.color=r.results.every(x=>x.ok)?'var(--acc)':'var(--err)';
+    m.textContent=r.results.length?r.results.map(x=>(x.channel)+': '+(x.ok?'wysłano':'błąd ('+x.error+')')).join(' · '):'Brak włączonych kanałów.'}
+  catch(e){m.style.color='var(--err)';m.textContent='Nie wysłano: '+e.message}
+};
+
 // ------------------------------------------------------------------ zadania cron
 // uruchomienia: zrodlo "cron" (jeden wpis na uruchomienie, z kodem wyjscia); lista zadan: zrodlo "crondef"
 async function loadCron(){
@@ -657,10 +852,10 @@ async function loadCron(){
   await Promise.all([...jobs.values()].slice(0,80).map(async j=>{
     try{j.runs=parseLines(await(await api('query',{query:j.sel+' _time:30d',limit:20})).text()).sort((a,b)=>a._time<b._time?1:-1)}catch{}
   }));
-  C=[...jobs.values()];
+  C=[...jobs.values()];window.C_ALL=C;
   for(const j of C){j.last=j.runs[0]||null;j.bad=!!j.last&&j.last.cron_state!=='ok'}
   const bad=C.filter(j=>j.bad).length;$('#ncron').hidden=!bad;$('#ncron').textContent=bad;
-  renderCron();
+  renderCron();const sc=tree.scrollTop;renderTree();tree.scrollTop=sc;
 }
 const DOWL=['niedziele','poniedziałki','wtorki','środy','czwartki','piątki','soboty','niedziele'],DOWG=['niedzieli','poniedziałku','wtorku','środy','czwartku','piątku','soboty','niedzieli'];
 const MONG=['stycznia','lutego','marca','kwietnia','maja','czerwca','lipca','sierpnia','września','października','listopada','grudnia'];
@@ -696,8 +891,12 @@ function cronPl(s){
   return out[0].toUpperCase()+out.slice(1);
 }
 const dur=s=>s==null||s===''?'':s<90?s+' s':s<5400?Math.round(s/60)+' min':dec(s/3600)+' godz.';
+function showCron(host){cronHost=host;renderCron();show('cron')}
 function renderCron(){
   const t=$('#cs').value.trim().toLowerCase(),f=$('#cf').value,tiles=$('#ctiles'),tbl=$('#ctbl');
+  const fam=cronHost?family(cronHost):null,C=fam?window.C_ALL.filter(j=>fam.includes(j.host)):window.C_ALL;
+  $('#ctitle').textContent=cronHost?'Zadania cron: '+cronHost:'Zadania cron';
+  $('#csub').textContent=cronHost?(fam.length>1?'Ta maszyna i jej kontenery ('+fam.slice(1).join(', ')+').':'Ta maszyna.')+' Wszystkie maszyny: „Zadania cron” w menu.':'Ostatnie uruchomienia, kody wyjścia i harmonogramy ze wszystkich maszyn.';
   const bad=C.filter(j=>j.bad).length,never=C.filter(j=>!j.last).length;
   tiles.textContent='';
   for(const [v,l,c] of [[C.length,'zadań',''],[C.length-bad-never,'ostatnio zakończone poprawnie','g'],[bad,'z błędem w ostatnim uruchomieniu',bad?'e':''],[num(sum(C.map(j=>j.c24))),'uruchomień w 24 h',''],[num(sum(C.map(j=>j.e24))),'nieudanych w 24 h',sum(C.map(j=>j.e24))?'e':'']]){
@@ -741,15 +940,19 @@ function pick(sel,meta,lvl,range){
   show('logs');headStats();reload();
 }
 const matching=()=>!cur?[]:D.units.filter(u=>cur.sel===ALL||(cur.meta.unit?u.sel===cur.sel:u.host===cur.meta.host));
-async function headStats(){
+// zasoby w naglowku logow: kontener Dockera, caly serwer albo stan uslugi
+function resBox(){
   if(!cur)return;
-  const e=sum(matching().map(u=>u.e24)),eb=$('#e24');eb.textContent=num(e);eb.style.color=e?'var(--err)':'';
-  // zasoby: kontener Dockera albo caly serwer
   const m=cur.meta,s=m.host?D.stat.get(m.host):null,box=$('#resbox');let lab='',val='';
-  if(s&&m.source==='docker'){const c=s.cmap.get(m.unit);if(c){lab='Kontener';val=c.cpu!=null&&c.cpu!==undefined?'CPU '+pc(fnum(c.cpu))+' · RAM '+String(c.mem||'').split('/')[0].trim():cstate(c)[1]}}
+  if(s&&m.source==='docker'){const c=s.cmap.get(m.unit);if(c){lab='Kontener';val=c.cpu!=null?'CPU '+pc(fnum(c.cpu))+' · RAM '+String(c.mem||'').split('/')[0].trim():cstate(c)[1]}}
   else if(s&&!m.unit){lab='Serwer';val='CPU '+pc(s.cpu)+' · RAM '+pc(s.mem)+' · dysk '+pc(s.disk)}
   else if(s&&m.source==='journald'&&/\.service$/.test(m.unit)){lab='Usługa';val=ustate({host:m.host,source:'journald',unit:m.unit})[1]}
   box.hidden=!val;$('#reslbl').textContent=lab;$('#resval').textContent=val;
+}
+async function headStats(){
+  if(!cur)return;
+  const e=sum(matching().map(u=>u.e24)),eb=$('#e24');eb.textContent=num(e);eb.style.color=e?'var(--err)':'';
+  resBox();
   try{
     const sel=cur.sel,h=await hits(sel+' '+EXCL,Date.now()-60*6e4,6e4);
     if(!cur||cur.sel!==sel)return;
@@ -843,7 +1046,8 @@ log.onscroll=()=>{
 // ------------------------------------------------------------------ sterowanie
 for(const b of document.querySelectorAll('#nav button'))b.onclick=()=>{
   const g=b.dataset.go;
-  if(g==='over'||g==='cron')return show(g);
+  if(g==='cron'){cronHost=null;renderCron();return show(g)}
+  if(g==='over'||g==='notif')return show(g);
   pick(ALL,{title:g==='err'?'Błędy i ostrzeżenia':'Wszystkie logi',multi:true},g==='err'?'w':'',g==='err'?'1d':null);
 };
 for(const b of document.querySelectorAll('[data-tog]'))b.onclick=()=>document.body.classList.toggle('nos');

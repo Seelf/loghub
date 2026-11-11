@@ -233,6 +233,9 @@
     return out;
   }
   let user = { user: 'admin', role: 'admin' };
+  let NCFG = { rules: { host_offline: { on: true, minutes: 3 }, service_down: { on: true }, cron_failed: { on: true }, disk: { on: true, pct: 90 },
+    cpu: { on: true, pct: 90, minutes: 10 }, mem: { on: true, pct: 90, minutes: 10 }, errors: { on: false, count: 50, minutes: 5 } },
+    notify_resolved: true, repeat_hours: 0, channels: [{ id: 'demo1', type: 'ntfy', on: true, name: 'telefon', url: 'https://ntfy.sh/moj-loghub', token: '' }] };
 
   window.loghubDemo = {
     async api(path, body, signal) {
@@ -269,6 +272,27 @@
         }));
       }
       return new Response('nieznana sciezka', { status: 404 });
+    },
+    // powiadomienia na niby: przykladowe alerty, ustawienia trzymane w pamieci strony
+    async notify(path, method, body) {
+      const now = Math.floor(Date.now() / 1000), m = 60;
+      if (path === 'state') return {
+        checked_at: now - 25, error: '', channels: NCFG.channels.filter(c => c.on !== false).length,
+        active: [
+          { key: 'ct:media:tdarr', kind: 'service_down', host: 'media', unit: 'tdarr', title: 'media: kontener tdarr padł', detail: 'padł: Exited (137) 3 hours ago', sev: 'error', since: now - 182 * m },
+          { key: 'unit:vps:fail2ban.service', kind: 'service_down', host: 'vps', unit: 'fail2ban.service', title: 'vps: usługa fail2ban.service padła', detail: 'systemd: failed', sev: 'error', since: now - 47 * m },
+          { key: 'offline:backup', kind: 'host_offline', host: 'backup', unit: '', title: 'backup: brak kontaktu z agentem', detail: 'Brak pomiarów od ponad 3 min.', sev: 'error', since: now - 2880 * m },
+          { key: 'disk:media', kind: 'disk', host: 'media', unit: '', title: 'media: dysk zajęty w 91%', detail: 'Próg: 90%.', sev: 'warn', since: now - 600 * m },
+          { key: 'ct:media:seerr', kind: 'service_down', host: 'media', unit: 'seerr', title: 'media: kontener seerr nie przechodzi kontroli zdrowia', detail: 'nie przechodzi kontroli zdrowia', sev: 'error', since: now - 300 * m }],
+        history: [
+          { kind: 'cron_failed', host: 'vps', unit: 'certbot renew --quiet', title: 'vps: zadanie cron zakończone błędem (kod 1)', detail: 'certbot renew --quiet', sev: 'error', since: now - 540 * m, until: now - 540 * m },
+          { kind: 'cpu', host: 'media', unit: '', title: 'media: CPU 94% (średnio 10 min)', detail: 'Próg: 90%.', sev: 'warn', since: now - 260 * m, until: now - 228 * m },
+          { kind: 'service_down', host: 'pve', unit: 'pveproxy.service', title: 'pve: usługa pveproxy.service padła', detail: 'systemd: failed', sev: 'error', since: now - 1500 * m, until: now - 1496 * m }],
+      };
+      if (path === 'config' && method === 'PUT') { NCFG = JSON.parse(JSON.stringify(body)); return JSON.parse(JSON.stringify(NCFG)); }
+      if (path === 'config') return JSON.parse(JSON.stringify(NCFG));
+      if (path === 'test') return { results: NCFG.channels.filter(c => c.on !== false).map(c => ({ channel: c.name || c.type, ok: true })) };
+      throw new Error('nieznana ścieżka');
     },
     // logowanie na niby: przyjmuje dowolne dane; uzytkownik "nowy" pokazuje pierwsze logowanie z 2FA
     async auth(path, body) {

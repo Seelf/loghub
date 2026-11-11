@@ -51,11 +51,11 @@ apt_base() {
 save_self() {
   local src="${BASH_SOURCE[0]:-}"
   mkdir -p "$(dirname "$SELF")"
+  # zapis przez plik tymczasowy i mv: nie psuje skryptu, ktory wlasnie dziala
   if [ -n "$src" ] && [ -f "$src" ]; then
-    [ "$(readlink -f "$src")" = "$SELF" ] || install -m 755 "$src" "$SELF"
+    [ "$(readlink -f "$src")" = "$SELF" ] || { cp "$src" "$SELF.new" && chmod 755 "$SELF.new" && mv -f "$SELF.new" "$SELF"; }
   else
-    curl -fsSL "$REPO_RAW/install.sh" -o "$SELF"
-    chmod 755 "$SELF"
+    curl -fsSL "$REPO_RAW/install.sh" -o "$SELF.new" && chmod 755 "$SELF.new" && mv -f "$SELF.new" "$SELF"
   fi
   # /usr/local/bin jest w PATH takze przy "pct exec" i bez sudo
   ln -sf "$SELF" /usr/local/bin/loghub
@@ -110,6 +110,20 @@ services:
       - ./authdata:/data
     restart: unless-stopped
 
+  notify:
+    image: python:3.13-alpine
+    command: ["python", "/app/notify.py"]
+    environment:
+      - LOGHUB_DATA=/data
+      - VL_URL=http://victorialogs:9428
+      - PUBLIC_URL=${PUBLIC_URL:-}
+    volumes:
+      - ./notify:/app:ro
+      - ./notifydata:/data
+    depends_on:
+      - victorialogs
+    restart: unless-stopped
+
   caddy:
     image: caddy:2-alpine
     ports:
@@ -123,6 +137,7 @@ services:
     depends_on:
       - victorialogs
       - auth
+      - notify
     restart: unless-stopped
 EOF
 
@@ -140,13 +155,31 @@ EOF
 	}
 
 	# ludzie: tylko odczyt, tylko z wazna sesja
+	# (naglowki X-User/X-Role od przegladarki sa usuwane; ustawia je wylacznie usluga logowania)
 	handle /select/* {
-		forward_auth auth:9000 {
-			uri /auth/verify
-			copy_headers X-User X-Role
+		route {
+			request_header -X-User
+			request_header -X-Role
+			forward_auth auth:9000 {
+				uri /auth/verify
+				copy_headers X-User X-Role
+			}
+			reverse_proxy victorialogs:9428 {
+				flush_interval -1
+			}
 		}
-		reverse_proxy victorialogs:9428 {
-			flush_interval -1
+	}
+
+	# powiadomienia: podglad dla zalogowanych, ustawienia tylko dla administratora
+	handle /api/notify/* {
+		route {
+			request_header -X-User
+			request_header -X-Role
+			forward_auth auth:9000 {
+				uri /auth/verify
+				copy_headers X-User X-Role
+			}
+			reverse_proxy notify:9100
 		}
 	}
 
@@ -190,7 +223,7 @@ EOF
 fetch_hub_files() {
   local src="${BASH_SOURCE[0]:-}" dir="" f
   [ -n "$src" ] && [ -f "$src" ] && dir="$(dirname "$(readlink -f "$src")")/hub"
-  for f in www/index.html www/demo.js auth/auth.py; do
+  for f in www/index.html www/demo.js auth/auth.py notify/notify.py; do
     if [ -n "$dir" ] && [ -f "$dir/$f" ]; then
       install -m 644 "$dir/$f" "$HUB_DIR/$f"
     else
@@ -214,8 +247,8 @@ cmd_hub() {
   USE_TS="${USE_TS:-1}"
   setup_tailscale
 
-  mkdir -p "$HUB_DIR/data" "$HUB_DIR/www" "$HUB_DIR/auth" "$HUB_DIR/authdata"
-  chmod 700 "$HUB_DIR/authdata"
+  mkdir -p "$HUB_DIR/data" "$HUB_DIR/www" "$HUB_DIR/auth" "$HUB_DIR/authdata" "$HUB_DIR/notify" "$HUB_DIR/notifydata"
+  chmod 700 "$HUB_DIR/authdata" "$HUB_DIR/notifydata"
   if [ ! -f "$HUB_DIR/.env" ]; then
     printf 'INGEST_TOKEN=%s\nRETENTION=%s\nVL_TAG=latest\nPORT=%s\n' \
       "$(rand 24)" "$RETENTION" "$PORT" > "$HUB_DIR/.env"
@@ -229,7 +262,9 @@ cmd_hub() {
   fetch_hub_files
 
   say "Uruchamiam centrale"
-  (cd "$HUB_DIR" && docker compose pull -q </dev/null && docker compose up -d </dev/null)
+  (cd "$HUB_DIR" && docker compose pull -q </dev/null && docker compose up -d --remove-orphans </dev/null)
+  # pliki uslug sa montowane z dysku: restart, zeby zaladowaly nowa wersje
+  (cd "$HUB_DIR" && docker compose restart auth notify caddy </dev/null >/dev/null 2>&1) || true
 
   local admin_out="" i
   if [ ! -s "$HUB_DIR/authdata/users.json" ]; then
@@ -529,13 +564,13 @@ setup_cron() {
 }
 
 # ----------------------------------------------------------- stan i zasoby
-# Co minute: CPU, RAM, dysk, obciazenie; stan kontenerow Dockera, uslug systemd i (na Proxmoxie) gosci LXC/VM.
+# Co ok. 20 s: CPU, RAM, dysk, obciazenie; stan kontenerow Dockera, uslug systemd i (na Proxmoxie) gosci LXC/VM.
 
 write_status_files() {
   mkdir -p "$CRON_LIB"
   cat > "$CRON_LIB/status.sh" <<'EOF'
 #!/bin/bash
-# loghub: jeden rekord JSON na minute ze stanem i zuzyciem zasobow tej maszyny (wyjscie trafia do journald)
+# loghub: jeden rekord JSON co ok. 20 s ze stanem i zuzyciem zasobow tej maszyny (wyjscie trafia do journald)
 cpu_sample() { awk '/^cpu /{print $2+$3+$4+$7+$8+$9, $5+$6; exit}' /proc/stat; }
 read -r pb pi < <(cpu_sample)
 sleep 5
@@ -568,7 +603,7 @@ while :; do
   fi
   printf '{"source":"stat","unit":"host","level":"6","message":"CPU %s%% · RAM %s%% · dysk %s%% · obciążenie %s","cpu":%s,"mem_pct":%s,"mem_total_kb":%s,"mem_avail_kb":%s,"disk_pct":%s,"disk_used_kb":%s,"disk_total_kb":%s,"load1":%s,"load5":%s,"cores":%s,"uptime_s":%s%s}\n' \
     "$cpu" "$mem" "$dp" "$l1" "$cpu" "$mem" "${mt:-0}" "${ma:-0}" "${dp:-0}" "${du:-0}" "${dt:-0}" "$l1" "$l5" "$cores" "$up" "$extra"
-  sleep 55
+  sleep 15   # razem z pomiarem (5 s) wychodzi rekord co ok. 20 s
 done
 EOF
   chmod 755 "$CRON_LIB/status.sh"
