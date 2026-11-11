@@ -1,0 +1,636 @@
+#!/usr/bin/env bash
+# loghub - centralne logi: VictoriaLogs + Vector + Tailscale
+#
+# Centrala (raz, na maszynie z Dockerem lub pod Dockera):
+#   curl -fsSL https://raw.githubusercontent.com/Seelf/loghub/main/install.sh | sudo bash -s -- hub
+#   (na Proxmoxie wygodniej: proxmox.sh, ktory sam tworzy kontener LXC z centrala)
+#
+# Agent (na kazdej obserwowanej maszynie; komende z tokenem wypisuje centrala):
+#   curl -fsSL .../install.sh | sudo bash -s -- agent --hub http://ADRES:8080 --token TOKEN
+#   opcje: --name NAZWA  --logs "/sciezka/*.log,..."  --no-cron  --no-lxc  --no-tailscale
+#
+# Uzytkownicy strony (na centrali; haslo + kod 2FA z aplikacji):
+#   loghub user add NAZWA [--role admin|viewer] | user del|passwd|reset-2fa NAZWA | user list
+#
+# Dostep z internetu (na centrali, przez Tailscale Funnel):
+#   loghub public on | off | status
+#
+# Calosc jest w funkcji main() wywolanej na koncu pliku, zeby polecenia
+# czytajace stdin nie zjadly skryptu przy uruchomieniu przez "curl | bash".
+
+set -euo pipefail
+
+# Repozytorium na GitHubie (musi byc publiczne). Inna nazwa: LOGHUB_REPO=uzytkownik/repo
+REPO="${LOGHUB_REPO:-Seelf/loghub}"
+REPO_RAW="${LOGHUB_REPO_RAW:-https://raw.githubusercontent.com/$REPO/main}"
+SELF=/usr/local/sbin/loghub
+HUB_DIR=/opt/loghub
+PORT="${LOGHUB_PORT:-8080}"          # prywatny: agenci + strona w sieci lokalnej i Tailscale
+PUBLIC_PORT=8081                     # publiczny: tylko strona z logowaniem, tylko dla Tailscale Funnel
+RETENTION="${LOGHUB_RETENTION:-100d}"
+STREAM_ARGS='_stream_fields=host,source,unit&_msg_field=message&_time_field=timestamp'
+
+say()  { printf '\033[1;32m==>\033[0m %s\n' "$*"; }
+warn() { printf '\033[1;33m!!\033[0m  %s\n' "$*" >&2; }
+die()  { printf '\033[1;31mBLAD:\033[0m %s\n' "$*" >&2; exit 1; }
+have() { command -v "$1" >/dev/null 2>&1; }
+rand() { od -An -tx1 -N "$1" /dev/urandom | tr -d ' \n'; }
+
+need_root() { [ "$(id -u)" -eq 0 ] || die "uruchom jako root (sudo)"; }
+
+in_lxc() { [ "$(systemd-detect-virt -c 2>/dev/null || true)" = "lxc" ]; }
+
+apt_base() {
+  have apt-get || die "obslugiwane sa tylko systemy z apt (Debian, Ubuntu, Proxmox)"
+  export DEBIAN_FRONTEND=noninteractive
+  apt-get update -qq
+  apt-get install -y -qq curl ca-certificates gnupg >/dev/null
+}
+
+# Zapisuje ten skrypt jako /usr/local/sbin/loghub (potrzebne do LXC i polecenia "user").
+save_self() {
+  local src="${BASH_SOURCE[0]:-}"
+  mkdir -p "$(dirname "$SELF")"
+  if [ -n "$src" ] && [ -f "$src" ]; then
+    [ "$(readlink -f "$src")" = "$SELF" ] || install -m 755 "$src" "$SELF"
+  else
+    curl -fsSL "$REPO_RAW/install.sh" -o "$SELF"
+    chmod 755 "$SELF"
+  fi
+}
+
+setup_tailscale() {
+  [ "$USE_TS" = 1 ] || return 0
+  if [ ! -c /dev/net/tun ]; then
+    warn "brak /dev/net/tun - pomijam Tailscale."
+    warn "W kontenerze LXC dopisz na hoscie do /etc/pve/lxc/<ID>.conf i zrestartuj kontener:"
+    warn "  lxc.cgroup2.devices.allow: c 10:200 rwm"
+    warn "  lxc.mount.entry: /dev/net/tun dev/net/tun none bind,create=file"
+    return 0
+  fi
+  if ! have tailscale; then
+    say "Instaluje Tailscale"
+    curl -fsSL https://tailscale.com/install.sh | sh
+  fi
+  systemctl enable --now tailscaled >/dev/null 2>&1 || true
+  if ! tailscale status >/dev/null 2>&1; then
+    say "Lacze z Tailscale (bez TS_AUTHKEY pojawi sie link do zalogowania)"
+    if [ -n "${TS_AUTHKEY:-}" ]; then
+      tailscale up --authkey="$TS_AUTHKEY"
+    else
+      tailscale up
+    fi
+  fi
+}
+
+# ---------------------------------------------------------------- centrala
+
+write_hub_files() {
+  cat > "$HUB_DIR/docker-compose.yml" <<'EOF'
+services:
+  victorialogs:
+    image: victoriametrics/victoria-logs:${VL_TAG:-latest}
+    command:
+      - -storageDataPath=/vlogs
+      - -retentionPeriod=${RETENTION:-100d}
+    volumes:
+      - ./data:/vlogs
+    restart: unless-stopped
+
+  auth:
+    image: python:3.13-alpine
+    command: ["python", "/app/auth.py", "serve"]
+    environment:
+      - SESSION_SECRET=${SESSION_SECRET}
+      - LOGHUB_DATA=/data
+    volumes:
+      - ./auth:/app:ro
+      - ./authdata:/data
+    restart: unless-stopped
+
+  caddy:
+    image: caddy:2-alpine
+    ports:
+      - "${PORT:-8080}:8080"
+      - "127.0.0.1:8081:8081"
+    environment:
+      - INGEST_TOKEN=${INGEST_TOKEN}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./www:/srv:ro
+    depends_on:
+      - victorialogs
+      - auth
+    restart: unless-stopped
+EOF
+
+  cat > "$HUB_DIR/Caddyfile" <<'EOF'
+{
+	admin off
+	auto_https off
+}
+
+# Wspolna czesc obu wejsc: logowanie, odczyt logow po zalogowaniu, sama strona.
+(app) {
+	# logowanie, 2FA, sesje
+	reverse_proxy /auth/* auth:9000 {
+		header_up X-Forwarded-Proto {args[0]}
+	}
+
+	# ludzie: tylko odczyt, tylko z wazna sesja
+	handle /select/* {
+		forward_auth auth:9000 {
+			uri /auth/verify
+			copy_headers X-User X-Role
+		}
+		reverse_proxy victorialogs:9428 {
+			flush_interval -1
+		}
+	}
+
+	# sama strona (bez danych) pokazuje formularz logowania
+	header {
+		X-Frame-Options DENY
+		X-Content-Type-Options nosniff
+		Referrer-Policy no-referrer
+		Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; frame-ancestors 'none'"
+	}
+	encode gzip
+	root * /srv
+	file_server
+}
+
+# Wejscie prywatne (siec lokalna i Tailscale): agenci wysylaja logi, ludzie ogladaja strone.
+:8080 {
+	@ingest_ok {
+		path /insert/*
+		header Authorization "Bearer {$INGEST_TOKEN}"
+	}
+	route {
+		reverse_proxy @ingest_ok victorialogs:9428
+		respond /insert/* 401
+		import app http
+	}
+}
+
+# Wejscie publiczne (tylko przez Tailscale Funnel, zawsze HTTPS): sama strona z logowaniem.
+# Nie ma tu przyjmowania logow ani panelu zapytan zaawansowanych.
+:8081 {
+	@closed path /insert/* /select/vmui* /delete/* /internal/*
+	route {
+		respond @closed 404
+		import app https
+	}
+}
+EOF
+}
+
+fetch_hub_files() {
+  local src="${BASH_SOURCE[0]:-}" dir="" f
+  [ -n "$src" ] && [ -f "$src" ] && dir="$(dirname "$(readlink -f "$src")")/hub"
+  for f in www/index.html www/demo.js auth/auth.py; do
+    if [ -n "$dir" ] && [ -f "$dir/$f" ]; then
+      install -m 644 "$dir/$f" "$HUB_DIR/$f"
+    else
+      curl -fsSL "$REPO_RAW/hub/$f" -o "$HUB_DIR/$f"
+    fi
+  done
+}
+
+# Konta trzyma usluga auth (hasla jako scrypt, sekrety 2FA) w $HUB_DIR/authdata/users.json.
+auth_cli() { (cd "$HUB_DIR" && docker compose exec -T auth python /app/auth.py user "$@" </dev/null); }
+
+cmd_hub() {
+  need_root
+  apt_base
+  save_self
+  if ! have docker; then
+    say "Instaluje Dockera"
+    curl -fsSL https://get.docker.com | sh
+  fi
+  docker compose version >/dev/null 2>&1 || die "brak wtyczki 'docker compose'"
+  USE_TS="${USE_TS:-1}"
+  setup_tailscale
+
+  mkdir -p "$HUB_DIR/data" "$HUB_DIR/www" "$HUB_DIR/auth" "$HUB_DIR/authdata"
+  chmod 700 "$HUB_DIR/authdata"
+  if [ ! -f "$HUB_DIR/.env" ]; then
+    printf 'INGEST_TOKEN=%s\nRETENTION=%s\nVL_TAG=latest\nPORT=%s\n' \
+      "$(rand 24)" "$RETENTION" "$PORT" > "$HUB_DIR/.env"
+  fi
+  grep -q '^SESSION_SECRET=' "$HUB_DIR/.env" || printf 'SESSION_SECRET=%s\n' "$(rand 32)" >> "$HUB_DIR/.env"
+  chmod 600 "$HUB_DIR/.env"
+  # shellcheck disable=SC1091
+  . "$HUB_DIR/.env"
+
+  write_hub_files
+  fetch_hub_files
+
+  say "Uruchamiam centrale"
+  (cd "$HUB_DIR" && docker compose pull -q </dev/null && docker compose up -d </dev/null)
+
+  local admin_out="" i
+  if [ ! -s "$HUB_DIR/authdata/users.json" ]; then
+    for i in 1 2 3 4 5 6 7 8 9 10; do
+      admin_out="$(auth_cli add admin --role admin 2>/dev/null)" && break
+      sleep 2
+    done
+    [ -n "$admin_out" ] || warn "nie udalo sie zalozyc konta admin; sprobuj recznie: loghub user add admin --role admin"
+  fi
+
+  local ts_ip lan_ip hub_url
+  ts_ip="$(tailscale ip -4 2>/dev/null || true)"
+  lan_ip="$(hostname -I 2>/dev/null | awk '{print $1}')"
+  hub_url="http://${ts_ip:-$lan_ip}:$PORT"
+
+  echo
+  say "Centrala dziala."
+  echo "  Strona:        $hub_url"
+  [ -n "$ts_ip" ] && echo "  W sieci LAN:   http://$lan_ip:$PORT"
+  if [ -n "$admin_out" ]; then
+    echo "  Konto administratora (zapisz haslo, nie pokaze sie ponownie):"
+    printf '%s\n' "$admin_out" | sed 's/^/    /'
+  fi
+  echo "  Podglad demo:  $hub_url/?demo   (przykladowe dane, bez agentow)"
+  echo "  Uzytkownicy:   loghub user add NAZWA [--role admin|viewer]"
+  echo "  Publicznie:    loghub public on   (sama strona z logowaniem 2FA, HTTPS przez Tailscale Funnel)"
+  echo
+  echo "Instalacja agenta na kazdej maszynie:"
+  echo "  curl -fsSL $REPO_RAW/install.sh | sudo bash -s -- agent \\"
+  echo "    --hub $hub_url --hub-lan http://$lan_ip:$PORT --token $INGEST_TOKEN"
+}
+
+cmd_user() {
+  need_root
+  [ -d "$HUB_DIR" ] || die "to nie jest centrala (brak $HUB_DIR)"
+  auth_cli "$@"
+}
+
+# Wystawia strone na swiat przez Tailscale Funnel (HTTPS, bez otwierania portow na routerze).
+cmd_public() {
+  need_root
+  [ -d "$HUB_DIR" ] || die "to nie jest centrala (brak $HUB_DIR)"
+  have tailscale || die "brak Tailscale na tej maszynie"
+  # shellcheck disable=SC1091
+  . "$HUB_DIR/.env"
+  case "${1:-status}" in
+    on)
+      [ -s "$HUB_DIR/authdata/users.json" ] || die "najpierw zaloz konto: loghub user add admin --role admin"
+      # Funnel wymaga wlaczonego HTTPS i Funnel w panelu Tailscale; polecenie samo poda link, jesli czegos brakuje.
+      tailscale funnel --bg "$PUBLIC_PORT"
+      tailscale funnel status
+      warn "Strona jest teraz dostepna z internetu (adres powyzej). Chroni ja logowanie haslem i kodem 2FA."
+      warn "Przyjmowanie logow od agentow i panel zapytan zostaja tylko w sieci lokalnej i Tailscale."
+      ;;
+    off) tailscale funnel reset; say "Strona jest znowu dostepna tylko w Tailscale i sieci lokalnej." ;;
+    status) tailscale funnel status ;;
+    *) die "uzycie: loghub public on|off|status" ;;
+  esac
+}
+
+# ------------------------------------------------------------------ agent
+
+write_vector_config() {
+  local cfg=/etc/vector/vector.yaml inputs=""
+  mkdir -p /etc/vector /var/lib/vector
+  {
+    echo "# wygenerowane przez loghub - nie edytuj recznie, uruchom skrypt ponownie"
+    echo "data_dir: /var/lib/vector"
+    echo "sources:"
+    if have journalctl; then
+      echo "  journal:"
+      echo "    type: journald"
+    fi
+    echo "  files:"
+    echo "    type: file"
+    echo "    read_from: end"
+    echo "    include:"
+    echo "      - /var/log/**/*.log"
+    local IFS=','
+    for p in $EXTRA_LOGS; do
+      [ -n "$p" ] && echo "      - \"$p\""
+    done
+    unset IFS
+    echo "    exclude:"
+    echo "      - /var/log/journal/**"
+    if [ -S /var/run/docker.sock ]; then
+      echo "  docker:"
+      echo "    type: docker_logs"
+    fi
+    echo "transforms:"
+    if have journalctl; then
+      inputs="t_journal"
+      cat <<EOF
+  t_journal:
+    type: remap
+    inputs: [journal]
+    source: |
+      unit = string(._SYSTEMD_UNIT) ?? string(.SYSLOG_IDENTIFIER) ?? "kernel"
+      level = string(.PRIORITY) ?? ""
+      msg = string(.message) ?? ""
+      out = {"host": "$NAME", "source": "journald", "unit": unit, "level": level, "message": msg, "timestamp": .timestamp}
+EOF
+      if [ "$CRON_VRL" = 1 ]; then cat <<EOF
+      if .SYSLOG_IDENTIFIER == "loghub-cron" {
+        run, err = parse_json(msg)
+        if err == null && is_object(run) {
+          out = merge(out, object!(run))
+          out.host = "$NAME"
+        }
+      }
+EOF
+      fi
+      echo "      . = out"
+    fi
+    inputs="${inputs:+$inputs, }t_files"
+    cat <<EOF
+  t_files:
+    type: remap
+    inputs: [files]
+    source: |
+      unit = string(.file) ?? "file"
+      . = {"host": "$NAME", "source": "file", "unit": unit, "message": string(.message) ?? "", "timestamp": .timestamp}
+EOF
+    if [ -S /var/run/docker.sock ]; then
+      inputs="$inputs, t_docker"
+      cat <<EOF
+  t_docker:
+    type: remap
+    inputs: [docker]
+    source: |
+      unit = string(.container_name) ?? "container"
+      . = {"host": "$NAME", "source": "docker", "unit": unit, "message": string(.message) ?? "", "timestamp": .timestamp}
+EOF
+    fi
+    cat <<EOF
+sinks:
+  hub:
+    type: http
+    inputs: [$inputs]
+    uri: "$HUB/insert/jsonline?$STREAM_ARGS"
+    method: post
+    compression: gzip
+    encoding:
+      codec: json
+    framing:
+      method: newline_delimited
+    auth:
+      strategy: bearer
+      token: "$TOKEN"
+    healthcheck:
+      enabled: false
+    buffer:
+      type: disk
+      max_size: 268435488
+EOF
+  } > "$cfg"
+  chown root:vector "$cfg" 2>/dev/null || true
+  chmod 640 "$cfg"
+}
+
+# ------------------------------------------------------------------- cron
+# Debianowy cron z opcja "-L 15" zapisuje start, koniec i kod wyjscia kazdego zadania.
+# Usluga loghub-cron sklada te wpisy w jeden rekord na uruchomienie (JSON do journald).
+
+CRON_LIB=/usr/local/lib/loghub
+
+write_cron_files() {
+  mkdir -p "$CRON_LIB"
+  cat > "$CRON_LIB/cron.awk" <<'EOF'
+# wejscie: komunikaty crona (cron -L 15); wyjscie: jeden JSON na zakonczone uruchomienie
+function esc(s) { gsub(/\\/, "\\\\", s); gsub(/"/, "\\\"", s); gsub(/[[:cntrl:]]/, " ", s); return s }
+function emit(pid, cmd, user,   d, state, lvl, code, msg, unit) {
+  d = (pid in t0) ? systime() - t0[pid] : -1
+  if (pid in sig)     { state = "signal"; lvl = 3; code = 128 + sig[pid]; msg = "PRZERWANE sygnałem " sig[pid] }
+  else if (pid in rc) { state = "fail";   lvl = 3; code = rc[pid];       msg = "BŁĄD kod " rc[pid] }
+  else                { state = "ok";     lvl = 6; code = 0;             msg = "OK" }
+  if (d >= 0) msg = msg " · " d " s"
+  unit = (user == "root" ? "" : user ": ") substr(cmd, 1, 80)
+  printf "{\"source\":\"cron\",\"unit\":\"%s\",\"level\":\"%d\",\"message\":\"%s\",\"cron_state\":\"%s\",\"exit_code\":%d,", esc(unit), lvl, esc(msg " · " cmd), state, code
+  if (d >= 0) printf "\"duration_s\":%d,", d
+  printf "\"cron_user\":\"%s\",\"cron_cmd\":\"%s\",\"cron_pid\":%d}\n", esc(user), esc(cmd), pid
+  fflush()
+  delete t0[pid]; delete rc[pid]; delete sig[pid]
+}
+{
+  line = $0
+  if (match(line, /^\([^)]*\) (CMD|END) \(\[[0-9]+\] /)) {
+    head = substr(line, 1, RLENGTH); cmd = substr(line, RLENGTH + 1); sub(/\)$/, "", cmd)
+    user = head; sub(/^\(/, "", user); sub(/\).*/, "", user)
+    pid = head; sub(/^.*\(\[/, "", pid); sub(/\].*/, "", pid)
+    if (head ~ /\) CMD \(/) t0[pid] = systime(); else emit(pid, cmd, user)
+  } else if (match(line, /grandchild #[0-9]+ failed with exit status [0-9]+/)) {
+    s = substr(line, RSTART, RLENGTH); pid = s; sub(/^grandchild #/, "", pid); sub(/ .*/, "", pid)
+    sub(/.* /, "", s); rc[pid] = s + 0
+  } else if (match(line, /grandchild #[0-9]+ terminated by signal [0-9]+/)) {
+    s = substr(line, RSTART, RLENGTH); pid = s; sub(/^grandchild #/, "", pid); sub(/ .*/, "", pid)
+    sub(/.* /, "", s); sig[pid] = s + 0
+  }
+}
+EOF
+
+  cat > "$CRON_LIB/scan.awk" <<'EOF'
+# wypisuje zadania z jednego pliku crontab jako JSON; sys=1: format systemowy (z kolumna uzytkownika)
+function esc(s) { gsub(/\\/, "\\\\", s); gsub(/"/, "\\\"", s); gsub(/[[:cntrl:]]/, " ", s); return s }
+function word(   w) { if (!match(line, /^[^ \t]+[ \t]+/)) return ""; w = substr(line, 1, RLENGTH); line = substr(line, RLENGTH + 1); sub(/[ \t]+$/, "", w); return w }
+/^[ \t]*(#|$)/ { next }
+/^[ \t]*[A-Za-z_][A-Za-z0-9_]*[ \t]*=/ { next }
+{
+  line = $0; sub(/^[ \t]+/, "", line); sub(/[ \t]+$/, "", line)
+  n = (line ~ /^@/) ? 1 : 5; sched = ""
+  for (i = 1; i <= n; i++) { w = word(); if (w == "") next; sched = sched (i > 1 ? " " : "") w }
+  if (sys) { user = word(); if (user == "") next } else user = owner
+  if (line == "") next
+  unit = (user == "root" ? "" : user ": ") substr(line, 1, 80)
+  printf "{\"source\":\"crondef\",\"unit\":\"%s\",\"level\":\"6\",\"message\":\"harmonogram %s · %s · %s\",\"cron_sched\":\"%s\",\"cron_user\":\"%s\",\"cron_cmd\":\"%s\",\"cron_file\":\"%s\",\"cron_scan\":%d}\n", esc(unit), esc(sched), esc(user), esc(file), esc(sched), esc(user), esc(line), esc(file), scan
+}
+EOF
+
+  cat > "$CRON_LIB/cron-watch.sh" <<'EOF'
+#!/bin/sh
+# Lista zadan: sprawdzana co 10 minut, wysylana po zmianie i raz na tydzien.
+( last=""; n=0
+  while :; do
+    cur="$(/usr/local/sbin/loghub cron-scan 2>/dev/null | sed 's/"cron_scan":[0-9]*/"cron_scan":0/')"
+    if [ -n "$cur" ] && { [ "$cur" != "$last" ] || [ "$n" -ge 1008 ]; }; then
+      printf '%s\n' "$cur" | sed "s/\"cron_scan\":0/\"cron_scan\":$(date +%s)/"
+      last="$cur"; n=0
+    fi
+    n=$((n + 1)); sleep 600
+  done ) &
+# Wyniki uruchomien: cron zapisuje start, koniec i kod wyjscia, awk sklada je w jeden rekord.
+# mawk (domyslny awk w Debianie) czyta potok blokami; bez tej opcji wyniki przychodzilyby z opoznieniem
+if awk -W version 2>&1 | grep -qi mawk; then set -- -W interactive; else set --; fi
+journalctl -f -n 0 -t CRON -o cat | awk "$@" -f /usr/local/lib/loghub/cron.awk
+EOF
+  chmod 755 "$CRON_LIB/cron-watch.sh"
+
+  cat > /etc/systemd/system/loghub-cron.service <<'EOF'
+[Unit]
+Description=loghub: wyniki i lista zadan cron
+After=systemd-journald.service cron.service
+
+[Service]
+ExecStart=/usr/local/lib/loghub/cron-watch.sh
+SyslogIdentifier=loghub-cron
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
+EOF
+}
+
+# Wypisuje wszystkie zadania cron tej maszyny (JSON, po jednym w linii).
+cmd_cron_scan() {
+  local f now
+  now="$(date +%s)"
+  for f in /etc/crontab /etc/cron.d/*; do
+    [ -f "$f" ] || continue
+    case "$(basename "$f")" in *[!A-Za-z0-9_-]*) continue ;; esac
+    awk -v sys=1 -v file="$f" -v scan="$now" -f "$CRON_LIB/scan.awk" "$f"
+  done
+  for f in /var/spool/cron/crontabs/*; do
+    [ -f "$f" ] || continue
+    awk -v sys=0 -v owner="$(basename "$f")" -v file="$f" -v scan="$now" -f "$CRON_LIB/scan.awk" "$f"
+  done
+}
+
+setup_cron() {
+  CRON_VRL=0
+  [ "$DO_CRON" = 1 ] || return 0
+  # Kod wyjscia zapisuje tylko cron z Debiana, Ubuntu i Proxmoxa (wersje 3.0pl1-*); cronie i busybox tego nie umieja.
+  if ! have journalctl || ! dpkg-query -W -f='${Version}' cron 2>/dev/null | grep -q '^3\.0pl1'; then
+    if have crond || have cron; then warn "$NAME: ten cron nie zapisuje kodow wyjscia - pomijam podglad zadan cron"; fi
+    return 0
+  fi
+  say "Wlaczam podglad zadan cron"
+  local cur new
+  touch /etc/default/cron
+  sed -i '/^# loghub$/,+1d' /etc/default/cron
+  cur="$(sed -n 's/^EXTRA_OPTS=//p' /etc/default/cron | tail -1 | tr -d "\"'" | sed -E 's/-L *[0-9]+//; s/^ +| +$//g')"
+  new="${cur:+$cur }-L 15"
+  printf '# loghub\nEXTRA_OPTS="%s"\n' "$new" >> /etc/default/cron
+  # systemd czyta /etc/default/cron przy starcie uslugi; trwajace zadania nie sa przerywane
+  systemctl restart cron >/dev/null 2>&1 || warn "nie udalo sie zrestartowac crona"
+  write_cron_files
+  systemctl daemon-reload
+  systemctl enable loghub-cron >/dev/null 2>&1 || true
+  systemctl restart loghub-cron
+  CRON_VRL=1
+}
+
+fan_out_lxc() {
+  have pct || return 0
+  [ "$DO_LXC" = 1 ] || return 0
+  local id
+  for id in $(pct list 2>/dev/null | awk 'NR>1 && $2=="running" {print $1}'); do
+    say "LXC $id"
+    if ! pct exec "$id" -- sh -c 'command -v apt-get' >/dev/null 2>&1 </dev/null; then
+      warn "LXC $id: brak apt (np. Alpine) - pomijam"
+      continue
+    fi
+    pct exec "$id" -- mkdir -p "$(dirname "$SELF")" </dev/null
+    pct push "$id" "$SELF" "$SELF" --perms 755 </dev/null >/dev/null
+    pct exec "$id" -- "$SELF" agent --hub "$HUB_LAN" --token "$TOKEN" \
+      --no-lxc --no-tailscale </dev/null || warn "LXC $id: instalacja nieudana"
+  done
+  local stopped vms
+  stopped="$(pct list 2>/dev/null | awk 'NR>1 && $2!="running" {printf "%s ", $1}')"
+  [ -n "$stopped" ] && warn "Zatrzymane LXC pominiete: $stopped(uruchom skrypt ponownie po ich starcie)"
+  vms="$(qm list 2>/dev/null | awk 'NR>1 && $3=="running" {printf "%s(%s) ", $1, $2}')"
+  [ -n "$vms" ] && warn "VM-ki wymagaja uruchomienia tej samej komendy w srodku: $vms"
+  return 0
+}
+
+cmd_agent() {
+  HUB="" HUB_LAN="" TOKEN="" NAME="$(hostname)" EXTRA_LOGS="" DO_LXC=1 USE_TS=1 DO_CRON=1 CRON_VRL=0
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --hub) HUB="${2%/}"; shift 2 ;;
+      --hub-lan) HUB_LAN="${2%/}"; shift 2 ;;
+      --token) TOKEN="$2"; shift 2 ;;
+      --name) NAME="$2"; shift 2 ;;
+      --logs) EXTRA_LOGS="$2"; shift 2 ;;
+      --no-lxc) DO_LXC=0; shift ;;
+      --no-tailscale) USE_TS=0; shift ;;
+      --no-cron) DO_CRON=0; shift ;;
+      *) die "nieznana opcja: $1" ;;
+    esac
+  done
+  [ -n "$HUB" ] || die "podaj --hub http://ADRES:PORT"
+  [ -n "$TOKEN" ] || die "podaj --token (wypisuje go centrala)"
+  [ -n "$HUB_LAN" ] || HUB_LAN="$HUB"
+  printf '%s' "$NAME" | grep -Eq '^[A-Za-z0-9._-]+$' || die "nazwa hosta zawiera niedozwolone znaki: $NAME"
+
+  need_root
+  apt_base
+  save_self
+  if in_lxc; then USE_TS=0; fi
+  setup_tailscale
+
+  if ! have vector; then
+    say "Instaluje Vector"
+    bash -c "$(curl -fsSL https://setup.vector.dev)" </dev/null
+    apt-get install -y -qq vector >/dev/null
+  fi
+  local g
+  for g in systemd-journal adm docker; do
+    if getent group "$g" >/dev/null; then usermod -aG "$g" vector; fi
+  done
+
+  setup_cron
+  write_vector_config
+  if [ "$CRON_VRL" = 1 ] && ! vector validate --no-environment /etc/vector/vector.yaml >/dev/null 2>&1; then
+    # czesc dla crona nie moze zablokowac zbierania zwyklych logow
+    warn "$NAME: konfiguracja z zadaniami cron nie przeszla walidacji - instaluje bez niej"
+    CRON_VRL=0
+    write_vector_config
+  fi
+  vector validate --no-environment /etc/vector/vector.yaml >/dev/null \
+    || die "konfiguracja Vectora nie przeszla walidacji: vector validate /etc/vector/vector.yaml"
+  systemctl enable vector >/dev/null 2>&1 || true
+  systemctl restart vector
+
+  if curl -fsS -m 8 -o /dev/null -X POST \
+      -H "Authorization: Bearer $TOKEN" \
+      --data "{\"message\":\"loghub: agent zainstalowany\",\"host\":\"$NAME\",\"source\":\"loghub\",\"unit\":\"install\"}" \
+      "$HUB/insert/jsonline?_stream_fields=host,source,unit&_msg_field=message"; then
+    say "$NAME: agent dziala, centrala odpowiada"
+  else
+    warn "$NAME: agent zainstalowany, ale centrala $HUB nie odpowiada (logi czekaja w buforze na dysku)"
+  fi
+
+  fan_out_lxc
+}
+
+cmd_uninstall_agent() {
+  need_root
+  systemctl disable --now vector >/dev/null 2>&1 || true
+  apt-get remove -y -qq vector >/dev/null 2>&1 || true
+  rm -rf /etc/vector/vector.yaml /var/lib/vector
+  systemctl disable --now loghub-cron >/dev/null 2>&1 || true
+  rm -rf /etc/systemd/system/loghub-cron.service "$CRON_LIB"
+  if [ -f /etc/default/cron ] && grep -q '^# loghub$' /etc/default/cron; then
+    sed -i '/^# loghub$/,+1d' /etc/default/cron
+    systemctl restart cron >/dev/null 2>&1 || true
+  fi
+  say "Agent usuniety (Tailscale zostaje)."
+}
+
+main() {
+  local cmd="${1:-}"
+  [ $# -gt 0 ] && shift
+  case "$cmd" in
+    hub) cmd_hub "$@" ;;
+    agent) cmd_agent "$@" ;;
+    user) cmd_user "$@" ;;
+    public) cmd_public "$@" ;;
+    uninstall-agent) cmd_uninstall_agent "$@" ;;
+    cron-scan) cmd_cron_scan ;;
+    *) sed -n '2,16p' "${BASH_SOURCE[0]:-/dev/null}" 2>/dev/null | sed 's/^# \{0,1\}//'
+       die "uzycie: loghub hub | agent --hub URL --token T | user ... | public on|off|status | uninstall-agent" ;;
+  esac
+}
+
+main "$@"

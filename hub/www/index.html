@@ -1,0 +1,671 @@
+<!doctype html>
+<html lang="pl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>loghub</title>
+<style>
+/* uklad: panel zrodel po lewej; po prawej przeglad (kafle, karty serwerow, tabela) albo strumien logow z naglowkiem zrodla.
+   zielen = zyje / zaznaczone, bursztyn = wyroznienie i ostrzezenia, czerwien = bledy */
+:root{--bg:#f6f7f8;--panel:#eceff1;--card:#fff;--line:#d8dfe4;--fg:#172027;--mut:#5d6b76;--acc:#0c8a5e;--acc2:#a86200;--sel:#d3eee2;--err:#b3261e;--errbg:#fceceb;--warn:#8a5a00;--warnbg:#fcf3dc;--hl:#ffe08a;
+--sans:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;--mono:ui-monospace,"SF Mono","Cascadia Mono","JetBrains Mono",Menlo,Consolas,monospace}
+@media(prefers-color-scheme:dark){:root:not([data-theme=light]){color-scheme:dark;--bg:#101315;--panel:#15191c;--card:#191e22;--line:#283037;--fg:#dde4e9;--mut:#8996a1;--acc:#3ecf9a;--acc2:#f0a747;--sel:#14372c;--err:#ff7b72;--errbg:#2a1515;--warn:#f0b85a;--warnbg:#292010;--hl:#5c4a00}}
+:root[data-theme=dark]{color-scheme:dark;--bg:#101315;--panel:#15191c;--card:#191e22;--line:#283037;--fg:#dde4e9;--mut:#8996a1;--acc:#3ecf9a;--acc2:#f0a747;--sel:#14372c;--err:#ff7b72;--errbg:#2a1515;--warn:#f0b85a;--warnbg:#292010;--hl:#5c4a00}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;font:13px/1.45 var(--sans);background:var(--bg);color:var(--fg)}
+input,select,button{font:inherit;color:inherit;background:var(--card);border:1px solid var(--line);border-radius:6px;padding:5px 9px;min-width:0}
+button{cursor:pointer}
+button:hover:not(:disabled){border-color:var(--mut)}
+button:disabled{opacity:.45;cursor:default}
+:focus-visible{outline:2px solid var(--acc);outline-offset:1px}
+[hidden]{display:none!important}
+a{color:var(--acc)}
+h1{font-size:22px;margin:0;font-weight:650;text-wrap:balance}
+.mut{color:var(--mut)}
+.num{font-variant-numeric:tabular-nums}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--mut);opacity:.5;flex:none;display:inline-block}
+.dot.up{background:var(--acc);opacity:1}
+.chip{display:inline-flex;align-items:center;gap:5px;font-size:11px;padding:1px 8px;border:1px solid var(--line);border-radius:10px;color:var(--mut);white-space:nowrap}
+.chip.ok{color:var(--acc);border-color:var(--acc)}
+.chip.bad{color:var(--err);border-color:var(--err);background:var(--errbg)}
+.chip.wrn{color:var(--warn);border-color:var(--warn);background:var(--warnbg)}
+.lbl{font-size:11px;letter-spacing:.07em;text-transform:uppercase;color:var(--mut)}
+.sp{display:flex;align-items:flex-end;gap:1px;height:30px}
+.sp i{flex:1;min-height:2px;background:var(--acc);border-radius:1px}
+.sp i.z{background:var(--line)}
+
+/* logowanie */
+#login{height:100%;display:flex;align-items:center;justify-content:center;padding:16px}
+#login form{width:340px;max-width:100%;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:22px;display:flex;flex-direction:column;gap:10px}
+#login label{display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--mut)}
+#login input{padding:8px 10px;color:var(--fg)}
+#lgo{background:var(--acc);border-color:var(--acc);color:var(--bg);font-weight:600;padding:8px}
+#lerr{color:var(--err);min-height:1.4em}
+#enr{border:1px solid var(--acc2);border-radius:8px;padding:10px;display:flex;flex-direction:column;gap:6px}
+#key{font:14px var(--mono);letter-spacing:.06em;overflow-wrap:anywhere;color:var(--fg)}
+.brand{display:flex;align-items:center;gap:8px;font-size:17px;font-weight:700;letter-spacing:.01em}
+.brand i{width:14px;height:14px;border-radius:4px;background:var(--acc);box-shadow:5px 5px 0 -2px var(--acc2)}
+
+/* szkielet */
+#app{height:100%;display:flex}
+aside{width:264px;flex:none;display:flex;flex-direction:column;background:var(--panel);border-right:1px solid var(--line)}
+.nos aside{display:none}
+aside header{display:flex;align-items:center;gap:8px;padding:14px 14px 10px}
+#demo{font-size:11px;color:var(--warn);background:var(--warnbg);border:1px solid var(--warn);border-radius:9px;padding:0 7px}
+#nav{display:flex;flex-direction:column;gap:2px;padding:0 8px 8px;border-bottom:1px solid var(--line)}
+#nav button{display:flex;align-items:center;gap:8px;text-align:left;background:none;border:0;border-left:3px solid transparent;border-radius:6px;padding:6px 9px}
+#nav button:hover{background:var(--sel)}
+#nav button.on{background:var(--sel);border-left-color:var(--acc);color:var(--acc);font-weight:600}
+#nav small{margin-left:auto}
+aside .lbl{padding:10px 14px 4px}
+#f{margin:0 12px 6px}
+#tree{overflow:auto;flex:1;padding-bottom:8px}
+summary{display:flex;align-items:center;gap:8px;cursor:pointer;padding:5px 14px;font-weight:600;list-style:none}
+summary::-webkit-details-marker{display:none}
+summary small,.it small{margin-left:auto;font-weight:400;color:var(--mut);font-variant-numeric:tabular-nums}
+.grp{padding:5px 14px 1px 30px;color:var(--mut);font-size:10px;text-transform:uppercase;letter-spacing:.07em}
+.it{display:flex;align-items:center;gap:8px;padding:3px 14px 3px 27px;cursor:pointer;white-space:nowrap;border-left:3px solid transparent}
+.it span{overflow:hidden;text-overflow:ellipsis}
+.it .chip{padding:0 6px}
+.it:hover{background:var(--sel)}
+.it.on{background:var(--sel);border-left-color:var(--acc);color:var(--acc)}
+aside footer{display:flex;align-items:center;gap:8px;padding:9px 12px;border-top:1px solid var(--line)}
+aside footer b{overflow:hidden;text-overflow:ellipsis}
+aside footer button{margin-left:auto}
+main{flex:1;min-width:0;display:flex;flex-direction:column}
+.tog{background:none;border:0;font-size:16px;padding:2px 6px;color:var(--mut)}
+
+/* przeglad */
+#over{flex:1;overflow:auto;padding:18px 22px 28px;display:flex;flex-direction:column;gap:16px}
+#over>header{display:flex;align-items:flex-start;gap:10px}
+#tabs{display:flex;gap:4px;border-bottom:1px solid var(--line)}
+#tabs button{background:none;border:0;border-bottom:2px solid transparent;border-radius:0;padding:7px 12px;color:var(--mut)}
+#tabs button.on{color:var(--acc2);border-bottom-color:var(--acc2);font-weight:600}
+.tiles{display:flex;flex-wrap:wrap;gap:8px 34px}
+.tiles div{display:flex;flex-direction:column}
+.tiles b{font-size:24px;font-weight:650;font-variant-numeric:tabular-nums}
+.tiles .e b{color:var(--err)}.tiles .w b{color:var(--acc2)}.tiles .g b{color:var(--acc)}
+#cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px;display:flex;flex-direction:column;gap:10px}
+.card.off{border-color:var(--warn)}
+.card header{display:flex;align-items:center;gap:8px}
+.card header b{font:600 15px var(--mono);overflow:hidden;text-overflow:ellipsis}
+.card header .chip{margin-left:auto}
+.row{display:flex;align-items:baseline;gap:8px}
+.row .num{margin-left:auto}
+.kv{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;border-top:1px solid var(--line);padding-top:10px}
+.kv div{display:flex;flex-direction:column;min-width:0}
+.kv b{font-size:16px;font-variant-numeric:tabular-nums;white-space:nowrap}
+.kv .e{color:var(--err)}.kv .w{color:var(--warn)}
+.card footer{display:flex;gap:8px;border-top:1px solid var(--line);padding-top:10px}
+.card footer button{flex:1}
+#tools{display:flex;flex-wrap:wrap;gap:8px}
+#us{flex:1 1 200px}
+#tbl{border:1px solid var(--line);border-radius:12px;background:var(--card);overflow-x:auto}
+.tr{display:grid;grid-template-columns:minmax(150px,2fr) minmax(70px,1fr) 78px minmax(130px,1.5fr) 64px 64px 112px;gap:12px;align-items:center;padding:7px 14px;border-bottom:1px solid var(--line);min-width:760px}
+.tr:last-child{border-bottom:0}
+.tr.h{font-size:11px;letter-spacing:.07em;text-transform:uppercase;color:var(--mut)}
+.tr:not(.h){cursor:pointer}
+.tr:not(.h):hover{background:var(--sel)}
+.tr>:first-child{display:flex;align-items:center;gap:8px;font-family:var(--mono);overflow:hidden;white-space:nowrap}
+.vol{display:flex;align-items:center;gap:8px}
+.vol i{height:4px;border-radius:2px;background:var(--acc);min-width:1px}
+.vol span{font-variant-numeric:tabular-nums;width:44px;flex:none;text-align:right}
+#errs{border:1px solid var(--line);border-radius:12px;background:var(--card);padding:6px 0;font:12px/1.55 var(--mono)}
+#errs .r{cursor:pointer}
+#cronv{flex:1;overflow:auto;padding:18px 22px 28px;display:flex;flex-direction:column;gap:16px}
+#cronv>header{display:flex;align-items:flex-start;gap:10px}
+#ctools{display:flex;flex-wrap:wrap;gap:8px}
+#cs{flex:1 1 200px}
+#ctbl{border:1px solid var(--line);border-radius:12px;background:var(--card);overflow-x:auto}
+#ctbl .tr{grid-template-columns:118px minmax(220px,2.4fr) minmax(70px,.8fr) 116px 150px 44px 172px;min-width:940px}
+#ctbl .tr>:first-child{font-family:var(--sans)}
+.job{display:flex;flex-direction:column;min-width:0}
+.job b{font:400 12px var(--mono);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.job small{color:var(--mut);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.hist{display:flex;gap:2px;align-items:center;height:16px}
+.hist i{width:6px;height:14px;border-radius:2px;background:var(--acc)}
+.hist i.e{background:var(--err)}
+
+/* logi */
+#logs{flex:1;min-height:0;display:flex;flex-direction:column}
+#head{display:flex;flex-wrap:wrap;align-items:center;gap:8px 14px;padding:9px 14px;border-bottom:1px solid var(--line);background:var(--panel)}
+#title{display:flex;align-items:center;gap:8px;min-width:0;flex:1 1 220px}
+#title b{font:600 14px var(--mono);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.stat{display:flex;align-items:center;gap:10px;border:1px solid var(--line);border-radius:8px;padding:4px 10px;background:var(--card)}
+.stat b{font-size:14px;font-variant-numeric:tabular-nums}
+.stat .sp{width:120px;height:22px}
+#live{display:flex;align-items:center;gap:7px}
+#live[aria-pressed=true]{color:var(--acc);border-color:var(--acc)}
+#live[aria-pressed=true] .dot{background:var(--acc);opacity:1;animation:pulse 1.6s infinite}
+@keyframes pulse{50%{opacity:.35}}
+@media(prefers-reduced-motion:reduce){#live .dot{animation:none!important}}
+#bar{display:flex;flex-wrap:wrap;gap:6px;padding:7px 14px;border-bottom:1px solid var(--line)}
+#q{flex:1 1 200px}
+#box{flex:1;min-height:0;position:relative}
+#log{height:100%;overflow:auto;position:relative;padding:4px 0;font:12px/1.6 var(--mono)}
+.r{display:flex;gap:9px;padding:0 14px 0 11px;border-left:3px solid transparent;white-space:pre-wrap;overflow-wrap:anywhere}
+.r:hover{background:var(--panel)}
+.r time{flex:none;color:var(--mut);font-variant-numeric:tabular-nums}
+.r .lv{flex:none;width:7px;height:7px;border-radius:50%;margin-top:.55em;background:var(--line)}
+.r b{flex:none;color:var(--acc);font-weight:400}
+.r.e{border-left-color:var(--err);background:var(--errbg)}
+.r.e .lv{background:var(--err)}.r.e span{color:var(--err)}
+.r.w{border-left-color:var(--warn);background:var(--warnbg)}
+.r.w .lv{background:var(--warn)}.r.w span{color:var(--warn)}
+mark{background:var(--hl);color:inherit;border-radius:2px}
+.n{padding:24px 14px;color:var(--mut);font-family:var(--sans)}
+#pos{position:absolute;top:10px;left:50%;transform:translateX(-50%);display:flex;align-items:center;gap:10px;background:var(--card);border:1px solid var(--line);border-radius:16px;padding:4px 14px;font-size:12px;white-space:nowrap;pointer-events:none}
+#pos u{display:block;width:120px;height:4px;border-radius:2px;background:var(--line);overflow:hidden}
+#pos u i{display:block;height:100%;background:var(--acc)}
+#jump{position:absolute;right:22px;bottom:16px;background:var(--acc);color:var(--bg);border-color:var(--acc);border-radius:8px;padding:8px 12px;font-weight:600}
+#st{display:flex;gap:12px;padding:4px 14px;border-top:1px solid var(--line);color:var(--mut);font-size:11px}
+#st a{color:inherit;margin-left:auto}
+@media(max-width:760px){#app{flex-direction:column}aside{width:auto;max-height:42%;border-right:0;border-bottom:1px solid var(--line)}#over,#cronv{padding:14px 16px}.kv{grid-template-columns:repeat(2,1fr)}.stat .sp{width:70px}}
+</style>
+</head>
+<body>
+
+<div id="login" hidden>
+  <form id="lf" autocomplete="on">
+    <div class="brand"><i></i>loghub</div>
+    <div class="mut" id="lhint">Zaloguj się, żeby zobaczyć logi.</div>
+    <label>Użytkownik<input id="lu" name="username" autocomplete="username" autocapitalize="none" required></label>
+    <label>Hasło<input id="lp" name="password" type="password" autocomplete="current-password" required></label>
+    <label>Kod z aplikacji (2FA)<input id="lc" name="code" inputmode="numeric" autocomplete="one-time-code" maxlength="7" placeholder="6 cyfr; przy pierwszym logowaniu zostaw puste"></label>
+    <div id="enr" hidden>
+      <b>Pierwsze logowanie: włącz 2FA</b>
+      <span>1. W aplikacji z kodami (np. Aegis, Google Authenticator) dodaj konto i wpisz ten klucz:</span>
+      <span id="key"></span>
+      <span><button type="button" id="kcopy">kopiuj klucz</button> <a id="kuri">otwórz w aplikacji na tym urządzeniu</a></span>
+      <span>2. Wpisz wyżej 6-cyfrowy kod z aplikacji i zaloguj się jeszcze raz.</span>
+    </div>
+    <div id="lerr" role="alert"></div>
+    <button id="lgo">Zaloguj</button>
+  </form>
+</div>
+
+<div id="app" hidden>
+<aside>
+  <header><div class="brand"><i></i>loghub</div><span id="demo" hidden>demo</span></header>
+  <div id="nav">
+    <button data-go="over">Przegląd</button>
+    <button data-go="all">Wszystkie logi</button>
+    <button data-go="err">Błędy i ostrzeżenia<small class="chip bad" id="nerr" hidden></small></button>
+    <button data-go="cron">Zadania cron<small class="chip bad" id="ncron" hidden></small></button>
+  </div>
+  <div class="lbl">Serwery</div>
+  <input id="f" placeholder="filtruj źródła (Ctrl K)" aria-label="Filtruj źródła">
+  <nav id="tree" aria-label="Źródła logów"></nav>
+  <footer><b id="who"></b><span class="chip" id="role"></span><button id="out">Wyloguj</button></footer>
+</aside>
+
+<main>
+  <section id="over">
+    <header><button class="tog" data-tog title="Pokaż lub ukryj panel">☰</button><div><h1>Przegląd</h1><div class="mut">Stan serwerów i źródeł logów z ostatnich 24 godzin.</div></div></header>
+    <div id="tiles" class="tiles"></div>
+    <div id="tabs"><button data-tab="hosts" class="on">Serwery</button><button data-tab="units">Źródła</button><button data-tab="errs">Ostatnie błędy</button></div>
+    <div id="cards"></div>
+    <div id="units" hidden>
+      <div id="tools">
+        <input id="us" placeholder="szukaj źródła lub serwera" aria-label="Szukaj źródła">
+        <select id="usort" aria-label="Sortuj według"><option value="e24">błędy 24 h</option><option value="c24">linie 24 h</option><option value="last">ostatni log</option><option value="unit">nazwa</option></select>
+        <select id="udir" aria-label="Kolejność"><option value="-1">malejąco</option><option value="1">rosnąco</option></select>
+      </div>
+      <div id="tbl" style="margin-top:10px"></div>
+    </div>
+    <div id="errs" hidden></div>
+  </section>
+
+  <section id="cronv" hidden>
+    <header><button class="tog" data-tog title="Pokaż lub ukryj panel">☰</button><div><h1>Zadania cron</h1><div class="mut">Ostatnie uruchomienia, kody wyjścia i harmonogramy ze wszystkich maszyn.</div></div></header>
+    <div id="ctiles" class="tiles"></div>
+    <div id="ctools">
+      <input id="cs" placeholder="szukaj zadania lub serwera" aria-label="Szukaj zadania">
+      <select id="cf" aria-label="Pokaż"><option value="">wszystkie zadania</option><option value="bad">tylko z błędem</option><option value="never">jeszcze nie uruchomione</option></select>
+    </div>
+    <div id="ctbl"></div>
+  </section>
+
+  <section id="logs" hidden>
+    <div id="head">
+      <button class="tog" data-tog title="Pokaż lub ukryj panel">☰</button>
+      <div id="title"></div>
+      <div class="stat"><div><div class="lbl">Linie / min</div><b id="rate">–</b></div><div class="sp" id="rsp"></div></div>
+      <div class="stat"><div><div class="lbl">Błędy 24 h</div><b id="e24">–</b></div></div>
+      <button id="live" aria-pressed="true"><i class="dot"></i><span>Na żywo</span></button>
+    </div>
+    <div id="bar">
+      <input id="q" placeholder="szukaj w logach ( / )" aria-label="Szukaj w logach">
+      <select id="lvl" aria-label="Poziom"><option value="">wszystkie poziomy</option><option value="w">ostrzeżenia i błędy</option><option value="e">tylko błędy</option></select>
+      <select id="range" aria-label="Zakres czasu">
+        <option value="15m">15 min</option><option value="1h" selected>1 godz.</option><option value="6h">6 godz.</option>
+        <option value="1d">1 dzień</option><option value="7d">7 dni</option><option value="30d">30 dni</option><option value="100d">100 dni</option>
+      </select>
+    </div>
+    <div id="box"><div id="log"></div><div id="pos" hidden><span></span><u><i></i></u><span class="num"></span></div><button id="jump" hidden></button></div>
+    <div id="st"><span id="msg"></span><span id="cnt"></span><a id="adv" href="/select/vmui/">zapytania zaawansowane</a></div>
+  </section>
+</main>
+</div>
+
+<script>
+const $=s=>document.querySelector(s),MAX=5000,LIMIT=1000,ALL='*',H=36e5,F=['host','source','unit'];
+// filtry poziomu po stronie bazy: priorytet z journald, a gdy go brak - slowa w tresci
+const ERR='(level:<=3 OR (level:"" (i(error) OR i(err) OR i(fatal) OR i(panic) OR i(failed) OR i(critical))))';
+const WARN='(level:4 OR (level:"" (i(warn) OR i(warning) OR i(wrn))))';
+const SRC={journald:'systemd',docker:'docker',file:'pliki',cron:'cron'};
+const log=$('#log'),tree=$('#tree'),jump=$('#jump'),pos=$('#pos'),demo=()=>window.loghubDemo;
+let me=null,D={units:[],hosts:new Map()},C=[],cur=null,ctl=null,live=true,seen=new Set(),fresh=0,word='',view='over',tab='hosts',started=false;
+
+const quote=v=>JSON.stringify(String(v));
+const short=u=>String(u||'').replace(/^\/var\/log\//,'').replace(/\.service$/,'');
+const parseLines=t=>t.split('\n').filter(Boolean).map(l=>{try{return JSON.parse(l)}catch{return null}}).filter(Boolean);
+const status=t=>{$('#msg').textContent=t};
+const el=(tag,cls,text)=>{const e=document.createElement(tag);if(cls)e.className=cls;if(text!=null)e.textContent=text;return e};
+const dec=x=>x.toFixed(1).replace('.0','').replace('.',',');
+const num=n=>n>=1e6?dec(n/1e6)+'M':n>=1e4?Math.round(n/1e3)+'k':n>=1e3?dec(n/1e3)+'k':String(n);
+const sum=a=>a.reduce((x,y)=>x+y,0);
+const pad=n=>String(n).padStart(2,'0');
+const key=f=>f.host+'\n'+f.source+'\n'+f.unit;
+const selOf=u=>'{host='+quote(u.host)+',source='+quote(u.source)+',unit='+quote(u.unit)+'}';
+function rel(t){
+  if(!t)return 'brak';
+  const s=(Date.now()-t)/1e3;
+  return s<90?'przed chwilą':s<5400?Math.round(s/60)+' min temu':s<129600?Math.round(s/3600)+' godz. temu':Math.round(s/86400)+' dni temu';
+}
+const relS=t=>!t?'brak':rel(t)==='przed chwilą'?'teraz':rel(t).replace(' temu','');
+function fmt(d){
+  const h=pad(d.getHours())+':'+pad(d.getMinutes())+':'+pad(d.getSeconds());
+  return d.toDateString()===new Date().toDateString()?h:pad(d.getDate())+'.'+pad(d.getMonth()+1)+' '+h;
+}
+
+// ------------------------------------------------------------ API i logowanie
+async function api(path,params,signal){
+  const body=new URLSearchParams(params);
+  const r=demo()?await demo().api(path,body,signal):await fetch('/select/logsql/'+path,{method:'POST',body,signal});
+  if(r.status===401){showLogin('Sesja wygasła. Zaloguj się ponownie.');throw new Error('sesja wygasła')}
+  if(!r.ok)throw new Error(r.status+' '+(await r.text()).slice(0,200));
+  return r;
+}
+async function auth(path,body){
+  if(demo())return demo().auth(path,body);
+  const r=await fetch('/auth/'+path,body?{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}:{});
+  return {status:r.status,data:await r.json().catch(()=>({}))};
+}
+function showLogin(msg){
+  me=null;if(ctl)ctl.abort();
+  $('#app').hidden=true;$('#login').hidden=false;$('#enr').hidden=true;
+  $('#lp').value=$('#lc').value='';$('#lerr').textContent=msg||'';
+  if(demo())$('#lhint').textContent='Tryb demo: zaloguje dowolne dane. Wpisz użytkownika „nowy”, żeby zobaczyć pierwsze logowanie z włączaniem 2FA.';
+  $('#lu').focus();
+}
+function enter(u){
+  me=u;$('#login').hidden=true;$('#app').hidden=false;
+  $('#who').textContent=u.user;$('#role').textContent=u.role==='admin'?'administrator':'oglądający';
+  if(demo()){$('#demo').hidden=false;$('#adv').hidden=true}
+  if(!started){started=true;setInterval(refresh,6e4);setInterval(()=>{if(me&&view==='logs')headStats()},3e4)}
+  show(view);refresh();
+}
+$('#lf').onsubmit=async e=>{
+  e.preventDefault();$('#lgo').disabled=true;$('#lerr').textContent='';
+  try{
+    const {status:s,data:d}=await auth('login',{user:$('#lu').value,pass:$('#lp').value,code:$('#lc').value});
+    if(s===200&&d.user)return enter(d);
+    if(d.enroll){
+      $('#enr').hidden=false;$('#key').textContent=d.enroll.secret.replace(/(.{4})/g,'$1 ').trim();$('#kuri').href=d.enroll.uri;
+      $('#kcopy').onclick=()=>navigator.clipboard.writeText(d.enroll.secret).then(()=>{$('#kcopy').textContent='skopiowano'}).catch(()=>{});
+      $('#lerr').textContent=s===401?'Kod się nie zgadza. Sprawdź, czy telefon ma dobrą godzinę, i wpisz aktualny kod.':'';
+      $('#lc').placeholder='6 cyfr';$('#lc').focus();
+    }else $('#lerr').textContent=s===429?'Za dużo nieudanych prób. Spróbuj ponownie za '+(d.retry||60)+' s.':s===401?'Nieprawidłowy użytkownik, hasło lub kod.':'Logowanie nie działa (błąd '+s+'). Sprawdź, czy centrala jest uruchomiona.';
+  }catch(x){$('#lerr').textContent='Brak połączenia z centralą.'}
+  finally{$('#lgo').disabled=false}
+};
+$('#out').onclick=async()=>{await auth('logout',{}).catch(()=>{});showLogin('')};
+
+// ------------------------------------------------------------------- dane
+async function hits(query,from,step,fields=[]){
+  const now=Date.now(),t0=Math.floor(from/step)*step,n=Math.ceil((now-t0)/step);
+  const p=[['query',query],['start',new Date(from).toISOString()],['end',new Date(now).toISOString()],['step',step/1e3+'s'],...fields.map(f=>['field',f])];
+  const j=await(await api('hits',p)).json();
+  return (j.hits||[]).map(h=>{
+    const v=new Array(n).fill(0);
+    (h.timestamps||[]).forEach((ts,i)=>{const k=Math.floor((Date.parse(ts)-t0)/step);if(k>=0&&k<n)v[k]+=h.values[i]});
+    return {f:h.fields||{},v,total:h.total||0,t0};
+  });
+}
+const last24=v=>{const a=v.slice(-24);while(a.length<24)a.unshift(0);return a};
+
+async function refresh(){
+  if(!me)return;
+  try{
+    const now=Date.now();
+    const [all,er,wa,up]=await Promise.all([
+      hits('*',now-168*H,H,F),
+      hits(ERR,now-24*H,H,F).catch(()=>[]),
+      hits(WARN,now-24*H,H,F).catch(()=>[]),
+      api('query',{query:'_time:5m | stats by (host, source, unit) count() c'}).then(r=>r.text()).then(t=>new Set(parseLines(t).map(key))).catch(()=>null)]);
+    const E=new Map(er.map(h=>[key(h.f),h])),W=new Map(wa.map(h=>[key(h.f),h]));
+    D.units=all.filter(h=>h.f.host&&h.f.source!=='crondef').map(h=>{
+      const f=h.f,k=key(f),ev=E.has(k)?last24(E.get(k).v):null,li=h.v.findLastIndex(x=>x>0),isUp=up?up.has(k):li>=h.v.length-1;
+      return {host:f.host,source:f.source||'?',unit:f.unit||'?',k,c7:h.total,v:last24(h.v),c24:sum(last24(h.v)),ev,e24:ev?sum(ev):0,
+        w24:W.has(k)?sum(last24(W.get(k).v)):0,up:isUp,last:isUp?now:li<0?0:Math.min(now,h.t0+(li+1)*H)};
+    });
+    for(const u of D.units)u.sel=selOf(u);
+    D.hosts=new Map();
+    for(const u of D.units){
+      const h=D.hosts.get(u.host)||D.hosts.set(u.host,{name:u.host,units:[],c24:0,e24:0,w24:0,up:false,last:0,v:new Array(24).fill(0),ev:new Array(24).fill(0)}).get(u.host);
+      h.units.push(u);h.c24+=u.c24;h.e24+=u.e24;h.w24+=u.w24;h.up=h.up||u.up;h.last=Math.max(h.last,u.last);
+      u.v.forEach((x,i)=>{h.v[i]+=x});if(u.ev)u.ev.forEach((x,i)=>{h.ev[i]+=x});
+    }
+    renderTree();renderOver();loadCron();
+    if(view==='logs')headStats();
+    if(!D.units.length)status('Brak logów z ostatnich 7 dni. Zainstaluj agenta na pierwszej maszynie.');
+  }catch(e){status('Nie udało się odświeżyć listy źródeł: '+e.message)}
+}
+
+function spark(box,v,ev,stepMs){
+  box.textContent='';const max=Math.max(1,...v),end=Date.now();
+  v.forEach((x,i)=>{
+    const b=el('i',x?'':'z');b.style.height=x?Math.max(8,Math.round(x/max*100))+'%':'';
+    if(x&&ev&&ev[i]){const p=Math.min(100,Math.max(15,Math.round(ev[i]/x*100)));b.style.background='linear-gradient(to top,var(--err) '+p+'%,var(--acc) '+p+'%)'}
+    if(stepMs){const d=new Date(end-(v.length-1-i)*stepMs);b.title=pad(d.getHours())+':'+pad(stepMs<H?d.getMinutes():0)+' · '+x+' linii'+(ev&&ev[i]?' · '+ev[i]+' błędów':'')}
+    box.append(b);
+  });
+}
+
+// --------------------------------------------------------------- panel boczny
+function item(label,sel,meta,u){
+  const it=el('div','it');it.dataset.sel=sel;it.dataset.k=meta.k;it.tabIndex=0;it.setAttribute('role','button');
+  if(u&&u.source!=='cron'){const d=el('i','dot'+(u.up?' up':''));d.title=u.up?'pisze logi':'cisza od 5 minut';it.append(d)}
+  const n=el('span','',label);n.title=meta.title||label;it.append(n);
+  if(u&&u.e24){const c=el('span','chip bad',num(u.e24));c.title='błędy w 24 h';it.append(c)}
+  if(u)it.append(el('small','',num(u.c24)));
+  if(cur&&cur.sel===sel)it.classList.add('on');
+  it.onclick=()=>pick(sel,meta);
+  it.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();it.onclick()}};
+  return it;
+}
+function renderTree(){
+  const open=new Set([...tree.querySelectorAll('details[open]')].map(d=>d.dataset.h)),first=!tree.children.length;
+  tree.textContent='';
+  for(const h of [...D.hosts.values()].sort((a,b)=>a.name.localeCompare(b.name))){
+    const d=el('details');d.dataset.h=h.name;d.open=first||open.has(h.name);
+    const sm=el('summary'),dot=el('i','dot'+(h.up?' up':''));dot.title=h.up?'wysyła logi':'brak logów od 5 minut';
+    sm.append(dot,h.name,el('small','',num(h.c24)));d.append(sm);
+    d.append(item('cały serwer','{host='+quote(h.name)+'}',{k:h.name.toLowerCase(),title:h.name,host:h.name,multi:true}));
+    for(const src of [...new Set(h.units.map(u=>u.source))].sort()){
+      d.append(el('div','grp',SRC[src]||src));
+      for(const u of h.units.filter(u=>u.source===src).sort((a,b)=>a.unit.localeCompare(b.unit)))
+        d.append(item(short(u.unit),u.sel,{k:(u.host+' '+src+' '+u.unit).toLowerCase(),title:short(u.unit),host:u.host,source:src,unit:u.unit},u));
+    }
+    tree.append(d);
+  }
+  const e=sum(D.units.map(u=>u.e24));$('#nerr').hidden=!e;$('#nerr').textContent=num(e);
+  filterTree();
+}
+function filterTree(){
+  const t=$('#f').value.trim().toLowerCase();
+  for(const it of tree.querySelectorAll('.it'))it.hidden=!!t&&!it.dataset.k.includes(t);
+  for(const d of tree.querySelectorAll('details')){d.hidden=!!t&&!d.querySelector('.it:not([hidden])');if(t&&!d.hidden)d.open=true}
+}
+function marks(){
+  for(const x of tree.querySelectorAll('.it'))x.classList.toggle('on',view==='logs'&&!!cur&&x.dataset.sel===cur.sel);
+  const k=view!=='logs'?view:cur&&cur.sel===ALL?($('#lvl').value?'err':'all'):'';
+  for(const b of document.querySelectorAll('#nav button'))b.classList.toggle('on',b.dataset.go===k);
+}
+function show(v){view=v;$('#over').hidden=v!=='over';$('#logs').hidden=v!=='logs';$('#cronv').hidden=v!=='cron';marks()}
+
+// -------------------------------------------------------------------- przeglad
+function renderOver(){
+  const hs=[...D.hosts.values()],us=D.units,upH=hs.filter(h=>h.up).length,live=us.filter(u=>u.source!=='cron'),upU=live.filter(u=>u.up).length,e=sum(us.map(u=>u.e24)),w=sum(us.map(u=>u.w24));
+  const tiles=$('#tiles');tiles.textContent='';
+  for(const [v,l,c] of [[num(sum(us.map(u=>u.c24))),'linii w 24 h',''],[num(e),'błędów',e?'e':''],[num(w),'ostrzeżeń',w?'w':''],[upH+' / '+hs.length,'serwerów online',upH<hs.length?'w':'g'],[upU+' / '+live.length,'źródeł aktywnych','']]){
+    const d=el('div',c);d.append(el('b','',v),el('span','mut',l));tiles.append(d);
+  }
+  const cards=$('#cards');cards.textContent='';
+  for(const h of hs.sort((a,b)=>a.up-b.up||b.e24-a.e24||a.name.localeCompare(b.name))){
+    const c=el('div','card'+(h.up?'':' off')),hd=el('header');
+    hd.append(el('i','dot'+(h.up?' up':'')),el('b','',h.name),el('span','chip '+(h.up?'ok':'wrn'),h.up?'online':'milczy: '+rel(h.last)));
+    const r=el('div','row');r.append(el('span','lbl','Aktywność 24 h'),el('span','num mut',num(h.c24)+' linii'));
+    const sp=el('div','sp');spark(sp,h.v,h.ev,H);
+    const types=el('div','mut',[...new Set(h.units.map(u=>u.source))].sort().map(s=>h.units.filter(u=>u.source===s).length+' '+(SRC[s]||s)).join(' · '));
+    const kv=el('div','kv');
+    for(const [v,l,k] of [[num(h.c24),'linie',''],[num(h.e24),'błędy',h.e24?'e':''],[num(h.w24),'ostrzeżenia',h.w24?'w':''],[relS(h.last),'ostatni log','']]){
+      const d=el('div');d.append(el('b',k,v),el('span','mut',l));kv.append(d);
+    }
+    const ft=el('footer'),b1=el('button','','Logi'),b2=el('button','','Błędy');
+    const meta={title:h.name,host:h.name,multi:true};
+    b1.onclick=()=>pick('{host='+quote(h.name)+'}',meta,'');
+    b2.onclick=()=>pick('{host='+quote(h.name)+'}',meta,'e','1d');b2.disabled=!h.e24;
+    ft.append(b1,b2);c.append(hd,r,sp,types,kv,ft);cards.append(c);
+  }
+  renderUnits();
+  if(tab==='errs')loadErrs();
+}
+function renderUnits(){
+  const t=$('#us').value.trim().toLowerCase(),by=$('#usort').value,dir=+$('#udir').value,tbl=$('#tbl');
+  const us=D.units.filter(u=>!t||(u.host+' '+u.unit).toLowerCase().includes(t)).sort((a,b)=>(by==='unit'?a.unit.localeCompare(b.unit):a[by]-b[by])*dir||a.unit.localeCompare(b.unit));
+  const max=Math.max(1,...us.map(u=>u.c24));
+  tbl.textContent='';
+  const hd=el('div','tr h');for(const x of ['Źródło','Serwer','Typ','Linie 24 h','Błędy','Ostrz.','Ostatni log'])hd.append(el('span','',x));tbl.append(hd);
+  for(const u of us){
+    const r=el('div','tr'),n=el('span'),dt=el('i','dot'+(u.up?' up':''));if(u.source==='cron')dt.style.visibility='hidden';n.append(dt,el('span','',short(u.unit)));n.title=u.unit;
+    const vol=el('span','vol'),bar=el('i');bar.style.width=Math.round(u.c24/max*100)+'%';vol.append(el('span','',num(u.c24)),bar);
+    const e=el('span');if(u.e24)e.append(el('span','chip bad',num(u.e24)));else e.textContent='–';
+    const w=el('span');if(u.w24)w.append(el('span','chip wrn',num(u.w24)));else w.textContent='–';
+    r.append(n,el('span','',u.host),el('span','mut',SRC[u.source]||u.source),vol,e,w,el('span','mut',rel(u.last)));
+    r.tabIndex=0;r.onclick=()=>pick(u.sel,{title:short(u.unit),host:u.host,source:u.source,unit:u.unit},'');
+    r.onkeydown=x=>{if(x.key==='Enter')r.onclick()};
+    tbl.append(r);
+  }
+  if(!us.length)tbl.append(el('div','n','Żadne źródło nie pasuje do wyszukiwania.'));
+}
+async function loadErrs(){
+  const box=$('#errs');
+  try{
+    const rows=parseLines(await(await api('query',{query:ERR+' _time:1d',limit:50})).text()).sort((a,b)=>a._time<b._time?1:-1);
+    box.textContent='';
+    for(const o of rows){const r=row(o,true);r.onclick=()=>pick(selOf(o),{title:short(o.unit),host:o.host,source:o.source,unit:o.unit},'');box.append(r)}
+    if(!rows.length)box.append(el('div','n','Brak błędów w ostatnich 24 godzinach.'));
+  }catch(e){box.textContent='';box.append(el('div','n','Nie udało się wczytać błędów: '+e.message))}
+}
+for(const b of document.querySelectorAll('#tabs button'))b.onclick=()=>{
+  tab=b.dataset.tab;for(const x of document.querySelectorAll('#tabs button'))x.classList.toggle('on',x===b);
+  $('#cards').hidden=tab!=='hosts';$('#units').hidden=tab!=='units';$('#errs').hidden=tab!=='errs';
+  if(tab==='errs')loadErrs();
+};
+$('#us').oninput=$('#usort').onchange=$('#udir').onchange=renderUnits;
+
+// ------------------------------------------------------------------ zadania cron
+// uruchomienia: zrodlo "cron" (jeden wpis na uruchomienie, z kodem wyjscia); lista zadan: zrodlo "crondef"
+async function loadCron(){
+  const jobs=new Map(),jk=(h,u)=>h+'\n'+u;
+  for(const u of D.units.filter(u=>u.source==='cron'))jobs.set(jk(u.host,u.unit),{host:u.host,unit:u.unit,sel:u.sel,c24:u.c24,e24:u.e24,runs:[],def:null});
+  try{
+    const defs=parseLines(await(await api('query',{query:'{source="crondef"} _time:100d',limit:1000})).text()),scan={};
+    for(const d of defs)scan[d.host]=Math.max(scan[d.host]||0,+d.cron_scan||0);
+    for(const d of defs){
+      if((+d.cron_scan||0)!==scan[d.host])continue;
+      const k=jk(d.host,d.unit),j=jobs.get(k)||jobs.set(k,{host:d.host,unit:d.unit,sel:selOf({host:d.host,source:'cron',unit:d.unit}),c24:0,e24:0,runs:[]}).get(k);
+      j.def=d;
+    }
+  }catch{}
+  await Promise.all([...jobs.values()].slice(0,80).map(async j=>{
+    try{j.runs=parseLines(await(await api('query',{query:j.sel+' _time:30d',limit:20})).text()).sort((a,b)=>a._time<b._time?1:-1)}catch{}
+  }));
+  C=[...jobs.values()];
+  for(const j of C){j.last=j.runs[0]||null;j.bad=!!j.last&&j.last.cron_state!=='ok'}
+  const bad=C.filter(j=>j.bad).length;$('#ncron').hidden=!bad;$('#ncron').textContent=bad;
+  renderCron();
+}
+const dur=s=>s==null||s===''?'':s<90?s+' s':s<5400?Math.round(s/60)+' min':dec(s/3600)+' godz.';
+function renderCron(){
+  const t=$('#cs').value.trim().toLowerCase(),f=$('#cf').value,tiles=$('#ctiles'),tbl=$('#ctbl');
+  const bad=C.filter(j=>j.bad).length,never=C.filter(j=>!j.last).length;
+  tiles.textContent='';
+  for(const [v,l,c] of [[C.length,'zadań',''],[C.length-bad-never,'ostatnio zakończone poprawnie','g'],[bad,'z błędem w ostatnim uruchomieniu',bad?'e':''],[num(sum(C.map(j=>j.c24))),'uruchomień w 24 h',''],[num(sum(C.map(j=>j.e24))),'nieudanych w 24 h',sum(C.map(j=>j.e24))?'e':'']]){
+    const d=el('div',c);d.append(el('b','',v),el('span','mut',l));tiles.append(d);
+  }
+  const js=C.filter(j=>(!t||(j.host+' '+j.unit).toLowerCase().includes(t))&&(!f||(f==='bad'?j.bad:!j.last)))
+    .sort((a,b)=>b.bad-a.bad||(b.last?Date.parse(b.last._time):0)-(a.last?Date.parse(a.last._time):0)||a.unit.localeCompare(b.unit));
+  tbl.textContent='';
+  const hd=el('div','tr h');for(const x of ['Stan','Zadanie','Serwer','Harmonogram','Ostatnie uruchomienie','Kod','Historia'])hd.append(el('span','',x));tbl.append(hd);
+  for(const j of js){
+    const r=el('div','tr'),L=j.last,d=j.def,st=el('span');
+    st.append(el('span','chip '+(!L?'':j.bad?'bad':'ok'),!L?'nie uruchomione':L.cron_state==='ok'?'OK':L.cron_state==='signal'?'przerwane':'błąd'));
+    const job=el('span','job'),cmd=el('b','',(L&&L.cron_cmd)||(d&&d.cron_cmd)||j.unit);cmd.title=cmd.textContent;
+    job.append(cmd,el('small','',[(L&&L.cron_user)||(d&&d.cron_user),d?d.cron_file:'usunięte z crontaba'].filter(Boolean).join(' · ')));
+    const when=el('span','job');
+    if(L){const dt=new Date(L._time);when.append(el('span','',rel(+dt)),el('small','',[fmt(dt),dur(L.duration_s)].filter(Boolean).join(' · ')));when.title=dt.toLocaleString('sv')}
+    else when.append(el('span','mut','–'));
+    const code=el('span','num',L?String(L.exit_code??''):'–');if(j.bad)code.style.color='var(--err)';
+    const hist=el('span','hist');
+    for(const x of j.runs.slice().reverse()){const b=el('i',x.cron_state==='ok'?'':'e'),xd=new Date(x._time);b.title=fmt(xd)+' · '+(x.cron_state==='ok'?'OK':'kod '+x.exit_code)+(x.duration_s!=null?' · '+dur(x.duration_s):'');hist.append(b)}
+    const sch=el('span','num',d?d.cron_sched:'–');sch.style.fontFamily='var(--mono)';
+    r.append(st,job,el('span','',j.host),sch,when,code,hist);
+    r.tabIndex=0;r.onclick=()=>pick(j.sel,{title:short(j.unit),host:j.host,source:'cron',unit:j.unit},'','30d');
+    r.onkeydown=x=>{if(x.key==='Enter')r.onclick()};
+    tbl.append(r);
+  }
+  if(!js.length)tbl.append(el('div','n',C.length?'Żadne zadanie nie pasuje do filtra.':'Brak zadań cron. Agent zbiera je z maszyn z cronem z Debiana, Ubuntu lub Proxmoxa.'));
+}
+$('#cs').oninput=$('#cf').onchange=renderCron;
+
+// ------------------------------------------------------------------------ logi
+function pick(sel,meta,lvl,range){
+  cur={sel,meta};
+  if(lvl!=null)$('#lvl').value=lvl;
+  if(range)$('#range').value=range;
+  const t=$('#title');t.textContent='';
+  const us=matching(),up=us.some(u=>u.up);
+  t.append(el('i','dot'+(up?' up':'')),el('b','',meta.title));
+  if(meta.unit)t.append(el('span','chip',meta.host),el('span','chip',SRC[meta.source]||meta.source));
+  else t.append(el('span','chip',meta.host?'cały serwer · '+us.length+' źródeł':D.hosts.size+' serwerów · '+us.length+' źródeł'));
+  show('logs');headStats();reload();
+}
+const matching=()=>!cur?[]:D.units.filter(u=>cur.sel===ALL||(cur.meta.unit?u.sel===cur.sel:u.host===cur.meta.host));
+async function headStats(){
+  if(!cur)return;
+  const e=sum(matching().map(u=>u.e24)),eb=$('#e24');eb.textContent=num(e);eb.style.color=e?'var(--err)':'';
+  try{
+    const sel=cur.sel,h=await hits(sel,Date.now()-60*6e4,6e4);
+    if(!cur||cur.sel!==sel)return;
+    const v=(h[0]?h[0].v:new Array(61).fill(0)).slice(-60),r=sum(v.slice(-6,-1))/5;
+    $('#rate').textContent=r>=10?Math.round(r):r.toFixed(1).replace('.',',');
+    spark($('#rsp'),v,null,6e4);
+  }catch{}
+}
+
+// poziom wiersza: priorytet z journald, potem znacznik w tresci ([Warn], level=error, |WARNING |), na koncu slowa kluczowe
+function level(o,m){
+  const lv=parseInt(o.level,10);
+  if(!isNaN(lv))return lv<=3?'e':lv===4?'w':'';
+  const t=m.match(/(?:^|[\[|"=(])\s*(err|error|fatal|crit|critical|panic|wrn|warn|warning|inf|info|notice|dbg|debug)\b/i);
+  if(t)return /^(err|fat|cri|pan)/i.test(t[1])?'e':/^w/i.test(t[1])?'w':'';
+  return /\b(error|fatal|panic|fail(ed|ure)?|critical)\b/i.test(m)?'e':/\bwarn(ing)?\b/i.test(m)?'w':'';
+}
+function mark(span,text){
+  if(!word){span.textContent=text;return}
+  const low=text.toLowerCase(),w=word.toLowerCase();let i=0,j;
+  while((j=low.indexOf(w,i))>=0){span.append(text.slice(i,j),el('mark','',text.slice(j,j+w.length)));i=j+w.length}
+  span.append(text.slice(i));
+}
+function row(o,multi){
+  const m=o._msg||'',dt=new Date(o._time),d=el('div','r '+level(o,m));
+  d.dataset.t=+dt;
+  const t=el('time','',fmt(dt));t.title=dt.toLocaleString('sv');d.append(t,el('i','lv'));
+  if(multi)d.append(el('b','',(o.host||'')+'/'+short(o.unit)));
+  const s=el('span');mark(s,m);d.append(s);
+  return d;
+}
+const atEnd=()=>log.scrollHeight-log.scrollTop-log.clientHeight<60;
+function toEnd(){log.scrollTop=log.scrollHeight;fresh=0;jump.hidden=true;pos.hidden=true}
+function append(objs,initial){
+  const stick=initial||atEnd(),frag=document.createDocumentFragment(),multi=!cur.meta.unit;let n=0;
+  for(const o of objs){
+    const k=o._time+'|'+o._stream+'|'+o._msg;
+    if(seen.has(k))continue;
+    seen.add(k);frag.append(row(o,multi));n++;
+  }
+  if(n){const e=log.querySelector('.n');if(e)e.remove()}
+  log.append(frag);
+  while(log.childElementCount>MAX)log.firstElementChild.remove();
+  if(seen.size>MAX*2)seen=new Set([...seen].slice(-MAX));
+  if(stick)toEnd();else if(n){fresh+=n;jump.textContent='↓ '+fresh+' nowych';jump.hidden=false}
+  $('#cnt').textContent=log.querySelectorAll('.r').length+' linii';
+}
+async function reload(){
+  if(!cur)return;
+  if(ctl)ctl.abort();
+  ctl=new AbortController();const signal=ctl.signal;
+  log.textContent='';seen=new Set();fresh=0;jump.hidden=true;pos.hidden=true;$('#cnt').textContent='';marks();
+  word=$('#q').value.trim();
+  const lv=$('#lvl').value;
+  const q=cur.sel+(lv==='e'?' '+ERR:lv==='w'?' ('+ERR+' OR '+WARN+')':'')+(word?' ~'+quote('(?i)'+word.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')):'');
+  try{
+    status('Wczytuję…');
+    const txt=await(await api('query',{query:q+' _time:'+$('#range').value,limit:LIMIT},signal)).text();
+    const rows=parseLines(txt).sort((a,b)=>a._time<b._time?-1:a._time>b._time?1:0);
+    if(!rows.length)log.append(el('div','n','Brak logów w wybranym zakresie.'+(live?' Nowe linie pojawią się tutaj same.':'')));
+    append(rows,true);
+    status(rows.length>=LIMIT?'Pokazano '+LIMIT+' najnowszych linii z zakresu. Zawęź wyszukiwanie, żeby zobaczyć starsze.':'');
+    if(live)await tail(q,signal);
+  }catch(e){if(e.name!=='AbortError'&&me)status('Błąd: '+e.message)}
+}
+async function tail(q,signal){
+  const rd=(await api('tail',{query:q},signal)).body.getReader(),dec=new TextDecoder();
+  let buf='';
+  for(;;){
+    const {done,value}=await rd.read();
+    if(done)break;
+    buf+=dec.decode(value,{stream:true});
+    const i=buf.lastIndexOf('\n');
+    if(i<0)continue;
+    append(parseLines(buf.slice(0,i)));buf=buf.slice(i+1);
+  }
+  if(!signal.aborted){status('Połączenie na żywo przerwane, ponawiam…');setTimeout(()=>{if(!signal.aborted)reload()},3000)}
+}
+let posT;
+log.onscroll=()=>{
+  if(atEnd()){fresh=0;jump.hidden=true;pos.hidden=true;return}
+  const rows=log.children,max=log.scrollHeight-log.clientHeight;
+  if(!rows.length||!rows[0].dataset.t||max<=0)return;
+  let lo=0,hi=rows.length-1;
+  while(lo<hi){const m=(lo+hi)>>1;if(rows[m].offsetTop+rows[m].offsetHeight<=log.scrollTop)lo=m+1;else hi=m}
+  const p=Math.round(log.scrollTop/max*100);
+  pos.children[0].textContent=rel(+rows[lo].dataset.t);pos.querySelector('u i').style.width=p+'%';pos.children[2].textContent=p+'%';
+  pos.hidden=false;clearTimeout(posT);posT=setTimeout(()=>{pos.hidden=true},1500);
+};
+
+// ------------------------------------------------------------------ sterowanie
+for(const b of document.querySelectorAll('#nav button'))b.onclick=()=>{
+  const g=b.dataset.go;
+  if(g==='over'||g==='cron')return show(g);
+  pick(ALL,{title:g==='err'?'Błędy i ostrzeżenia':'Wszystkie logi',multi:true},g==='err'?'w':'',g==='err'?'1d':null);
+};
+for(const b of document.querySelectorAll('[data-tog]'))b.onclick=()=>document.body.classList.toggle('nos');
+$('#f').oninput=filterTree;
+$('#range').onchange=$('#lvl').onchange=reload;
+let deb;$('#q').oninput=()=>{clearTimeout(deb);deb=setTimeout(reload,400)};
+$('#q').onkeydown=e=>{if(e.key==='Escape'){e.target.value='';reload()}};
+$('#live').onclick=()=>{live=!live;$('#live').setAttribute('aria-pressed',live);$('#live span').textContent=live?'Na żywo':'Wstrzymane';reload()};
+jump.onclick=toEnd;
+document.onkeydown=e=>{
+  if(!me)return;
+  if(e.key==='/'&&view==='logs'&&!/INPUT|SELECT/.test(e.target.tagName)){e.preventDefault();$('#q').focus()}
+  if(e.key==='k'&&(e.ctrlKey||e.metaKey)){e.preventDefault();document.body.classList.remove('nos');$('#f').focus()}
+};
+
+if(innerWidth<760)document.body.classList.add('nos');
+async function boot(){
+  try{const {status:s,data:d}=await auth('me');if(s===200&&d.user)return enter(d)}catch{}
+  showLogin('');
+}
+if(!demo()&&new URLSearchParams(location.search).has('demo')){
+  const s=document.createElement('script');s.src='demo.js';s.onload=s.onerror=boot;document.head.append(s);
+}else boot();
+</script>
+</body>
+</html>

@@ -1,0 +1,66 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="680" height="464" viewBox="0 0 680 464" font-family="DejaVu Sans, Arial, sans-serif">
+  <title>loghub: przepływ danych</title>
+  <desc>Agenci na VPS, hoście pve i w kontenerach LXC oraz przeglądarka w domu łączą się z prywatnym wejściem centrali na porcie 8080. Przeglądarka z internetu trafia przez Tailscale Funnel na publiczne wejście 8081, które pokazuje tylko stronę z logowaniem. Oba wejścia korzystają z logowania 2FA i bazy VictoriaLogs.</desc>
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M2 1L8 5L2 9" fill="none" stroke="#5F5E5A" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+    </marker>
+  </defs>
+  <rect x="0" y="0" width="680" height="464" fill="#FFFFFF"/>
+
+  <g fill="#E1F5EE" stroke="#0F6E56" stroke-width="1">
+    <rect x="30" y="70" width="200" height="56" rx="8"/>
+    <rect x="30" y="146" width="200" height="56" rx="8"/>
+    <rect x="30" y="222" width="200" height="56" rx="8"/>
+  </g>
+  <rect x="30" y="298" width="200" height="56" rx="8" fill="#F1EFE8" stroke="#5F5E5A" stroke-width="1"/>
+  <g text-anchor="middle" dominant-baseline="central">
+    <text x="130" y="89" font-size="14" font-weight="bold" fill="#085041">VPS</text>
+    <text x="130" y="109" font-size="12" fill="#0F6E56">Vector, przez Tailscale</text>
+    <text x="130" y="165" font-size="14" font-weight="bold" fill="#085041">Host pve</text>
+    <text x="130" y="185" font-size="12" fill="#0F6E56">Vector, sieć lokalna</text>
+    <text x="130" y="241" font-size="14" font-weight="bold" fill="#085041">Kontenery LXC</text>
+    <text x="130" y="261" font-size="12" fill="#0F6E56">Vector, sieć lokalna</text>
+    <text x="130" y="317" font-size="14" font-weight="bold" fill="#444441">Przeglądarka w domu</text>
+    <text x="130" y="337" font-size="12" fill="#5F5E5A">LAN lub Tailscale</text>
+  </g>
+
+  <rect x="300" y="50" width="340" height="256" rx="12" fill="#F1EFE8" stroke="#5F5E5A" stroke-width="1"/>
+  <text x="470" y="69" font-size="14" font-weight="bold" fill="#444441" text-anchor="middle" dominant-baseline="central">Centrala: LXC na pve (Docker)</text>
+  <g fill="#EEEDFE" stroke="#534AB7" stroke-width="1">
+    <rect x="316" y="88" width="308" height="54" rx="8"/>
+    <rect x="316" y="154" width="308" height="54" rx="8"/>
+    <rect x="316" y="236" width="150" height="54" rx="8"/>
+    <rect x="474" y="236" width="150" height="54" rx="8"/>
+  </g>
+  <g text-anchor="middle" dominant-baseline="central">
+    <text x="470" y="106" font-size="14" font-weight="bold" fill="#3C3489">Wejście prywatne :8080</text>
+    <text x="470" y="126" font-size="12" fill="#534AB7">odbiór logów, strona</text>
+    <text x="470" y="172" font-size="14" font-weight="bold" fill="#3C3489">Wejście publiczne :8081</text>
+    <text x="470" y="192" font-size="12" fill="#534AB7">tylko strona z logowaniem</text>
+    <text x="391" y="254" font-size="14" font-weight="bold" fill="#3C3489">Logowanie + 2FA</text>
+    <text x="391" y="274" font-size="12" fill="#534AB7">hasło, kod, sesja</text>
+    <text x="549" y="254" font-size="14" font-weight="bold" fill="#3C3489">VictoriaLogs</text>
+    <text x="549" y="274" font-size="12" fill="#534AB7">100 dni historii</text>
+  </g>
+
+  <g fill="#F1EFE8" stroke="#5F5E5A" stroke-width="1">
+    <rect x="20" y="394" width="220" height="50" rx="8"/>
+    <rect x="300" y="394" width="230" height="50" rx="8"/>
+  </g>
+  <g text-anchor="middle" dominant-baseline="central" font-size="14" font-weight="bold" fill="#444441">
+    <text x="130" y="419">Przeglądarka z internetu</text>
+    <text x="415" y="419">Tailscale Funnel (HTTPS)</text>
+  </g>
+
+  <g fill="none" stroke="#5F5E5A" stroke-width="1.5">
+    <path d="M232 98 H264 V326 H232"/>
+    <line x1="232" y1="174" x2="264" y2="174"/>
+    <line x1="232" y1="250" x2="264" y2="250"/>
+    <line x1="264" y1="115" x2="312" y2="115" marker-end="url(#arrow)"/>
+    <line x1="391" y1="210" x2="391" y2="232" marker-end="url(#arrow)"/>
+    <line x1="549" y1="210" x2="549" y2="232" marker-end="url(#arrow)"/>
+    <line x1="242" y1="419" x2="296" y2="419" marker-end="url(#arrow)"/>
+    <path d="M530 419 H660 V181 H628" marker-end="url(#arrow)"/>
+  </g>
+</svg>
