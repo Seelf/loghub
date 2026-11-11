@@ -54,7 +54,9 @@ curl -fsSL https://raw.githubusercontent.com/Seelf/loghub/main/install.sh | sudo
 ```
 
 Agent sam instaluje Tailscale i Vectora. Na maszynie nie trzeba otwierać żadnego portu.
-Opcje: `--name NAZWA`, `--logs "/opt/ts3/logs/*.log,/srv/app/*.log"`, `--no-cron`, `--no-lxc`, `--no-tailscale`.
+Opcje: `--name NAZWA`, `--logs "/opt/ts3/logs/*.log,/srv/app/*.log"`, `--no-cron`, `--no-status`, `--no-lxc`, `--no-tailscale`.
+
+Aktualizacja: uruchom tę samą komendę jeszcze raz; nadpisze konfigurację agenta.
 
 ### 3. Pierwsze logowanie
 
@@ -90,6 +92,12 @@ loghub uninstall-agent
 ```
 
 Usuwa Vectora, usługę `loghub-cron` i wpis w `/etc/default/cron`. Tailscale zostaje.
+
+## Stan usług i zasoby
+
+Usługa `loghub-status` co minutę wysyła CPU, RAM, dysk i obciążenie maszyny, stan kontenerów Dockera
+(z `docker stats`), stan usług systemd, a na hoście Proxmox także listę kontenerów LXC i VM z ich zużyciem.
+Na stronie: kolorowe kropki (działa / zatrzymane / padło), wskaźniki na kartach serwerów i zakładka Zasoby.
 
 ## Zadania cron
 

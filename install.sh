@@ -7,7 +7,7 @@
 #
 # Agent (na kazdej obserwowanej maszynie; komende z tokenem wypisuje centrala):
 #   curl -fsSL .../install.sh | sudo bash -s -- agent --hub http://ADRES:8080 --token TOKEN
-#   opcje: --name NAZWA  --logs "/sciezka/*.log,..."  --no-cron  --no-lxc  --no-tailscale
+#   opcje: --name NAZWA  --logs "/sciezka/*.log,..."  --no-cron  --no-status  --no-lxc  --no-tailscale
 #
 # Uzytkownicy strony (na centrali; haslo + kod 2FA z aplikacji):
 #   loghub user add NAZWA [--role admin|viewer] | user del|passwd|reset-2fa NAZWA | user list
@@ -57,6 +57,8 @@ save_self() {
     curl -fsSL "$REPO_RAW/install.sh" -o "$SELF"
     chmod 755 "$SELF"
   fi
+  # /usr/local/bin jest w PATH takze przy "pct exec" i bez sudo
+  ln -sf "$SELF" /usr/local/bin/loghub
 }
 
 setup_tailscale() {
@@ -330,11 +332,18 @@ write_vector_config() {
       msg = string(.message) ?? ""
       out = {"host": "$NAME", "source": "journald", "unit": unit, "level": level, "message": msg, "timestamp": .timestamp}
 EOF
-      if [ "$CRON_VRL" = 1 ]; then cat <<EOF
-      if .SYSLOG_IDENTIFIER == "loghub-cron" {
+      # rekordy uslug loghub-cron i loghub-status (JSON) staja sie zrodlami "cron", "crondef" i "stat"
+      if [ "$JSON_VRL" = 1 ]; then cat <<EOF
+      ident = string(.SYSLOG_IDENTIFIER) ?? ""
+      if ident == "loghub-cron" || ident == "loghub-status" {
         run, err = parse_json(msg)
         if err == null && is_object(run) {
-          out = merge(out, object!(run))
+          r = object!(run)
+          if is_array(r.containers) { r.containers = encode_json(r.containers) }
+          if is_array(r.cstats) { r.cstats = encode_json(r.cstats) }
+          if is_array(r.units) { r.units = encode_json(r.units) }
+          if is_array(r.guests) { r.guests = encode_json(r.guests) }
+          out = merge(out, r)
           out.host = "$NAME"
         }
       }
@@ -497,7 +506,6 @@ cmd_cron_scan() {
 }
 
 setup_cron() {
-  CRON_VRL=0
   [ "$DO_CRON" = 1 ] || return 0
   # Kod wyjscia zapisuje tylko cron z Debiana, Ubuntu i Proxmoxa (wersje 3.0pl1-*); cronie i busybox tego nie umieja.
   if ! have journalctl || ! dpkg-query -W -f='${Version}' cron 2>/dev/null | grep -q '^3\.0pl1'; then
@@ -517,7 +525,80 @@ setup_cron() {
   systemctl daemon-reload
   systemctl enable loghub-cron >/dev/null 2>&1 || true
   systemctl restart loghub-cron
-  CRON_VRL=1
+  JSON_VRL=1
+}
+
+# ----------------------------------------------------------- stan i zasoby
+# Co minute: CPU, RAM, dysk, obciazenie; stan kontenerow Dockera, uslug systemd i (na Proxmoxie) gosci LXC/VM.
+
+write_status_files() {
+  mkdir -p "$CRON_LIB"
+  cat > "$CRON_LIB/status.sh" <<'EOF'
+#!/bin/bash
+# loghub: jeden rekord JSON na minute ze stanem i zuzyciem zasobow tej maszyny (wyjscie trafia do journald)
+cpu_sample() { awk '/^cpu /{print $2+$3+$4+$7+$8+$9, $5+$6; exit}' /proc/stat; }
+read -r pb pi < <(cpu_sample)
+sleep 5
+while :; do
+  read -r b i < <(cpu_sample)
+  cpu=$(awk -v b=$((b-pb)) -v i=$((i-pi)) 'BEGIN{t=b+i; printf "%.1f", (t>0 ? b*100/t : 0)}')
+  pb=$b; pi=$i
+  read -r mt ma < <(awk '/^MemTotal:/{t=$2} /^MemAvailable:/{a=$2} END{print t, a}' /proc/meminfo)
+  mem=$(awk -v t="$mt" -v a="$ma" 'BEGIN{printf "%.1f", (t>0 ? (t-a)*100/t : 0)}')
+  read -r du dt dp < <(df -Pk / | awk 'NR==2{sub(/%/,"",$5); print $3, $2, $5}')
+  read -r l1 l5 _ < /proc/loadavg
+  up=$(awk '{printf "%d", $1}' /proc/uptime)
+  cores=$(nproc 2>/dev/null || echo 1)
+  extra=""
+  if command -v docker >/dev/null 2>&1 && docker info >/dev/null 2>&1; then
+    ps=$(timeout 20 docker ps -a --format '{"n":{{json .Names}},"s":{{json .State}},"st":{{json .Status}}}' 2>/dev/null | paste -sd, -)
+    st=$(timeout 30 docker stats --no-stream --format '{"n":{{json .Name}},"cpu":{{json .CPUPerc}},"mem":{{json .MemUsage}},"memp":{{json .MemPerc}}}' 2>/dev/null | paste -sd, -)
+    extra="$extra,\"containers\":[${ps}],\"cstats\":[${st}]"
+  fi
+  if command -v systemctl >/dev/null 2>&1; then
+    # tylko uslugi aktywne, uruchamiane albo padniete; brak na liscie = nieaktywna bez bledu
+    un=$(systemctl list-units --type=service --all --no-legend --plain --no-pager 2>/dev/null | awk '
+      { i = ($1 ~ /\./) ? 1 : 2; u = $i; l = $(i+1); a = $(i+2); s = $(i+3)
+        if (l == "loaded" && a != "inactive") printf "%s[\"%s\",\"%s\",\"%s\"]", (n++ ? "," : ""), u, a, s }')
+    extra="$extra,\"units\":[${un}]"
+  fi
+  if command -v pvesh >/dev/null 2>&1; then
+    g=$(timeout 20 pvesh get /cluster/resources --type vm --output-format json 2>/dev/null)
+    case "$g" in \[*) extra="$extra,\"guests\":$g" ;; esac
+  fi
+  printf '{"source":"stat","unit":"host","level":"6","message":"CPU %s%% · RAM %s%% · dysk %s%% · obciążenie %s","cpu":%s,"mem_pct":%s,"mem_total_kb":%s,"mem_avail_kb":%s,"disk_pct":%s,"disk_used_kb":%s,"disk_total_kb":%s,"load1":%s,"load5":%s,"cores":%s,"uptime_s":%s%s}\n' \
+    "$cpu" "$mem" "$dp" "$l1" "$cpu" "$mem" "${mt:-0}" "${ma:-0}" "${dp:-0}" "${du:-0}" "${dt:-0}" "$l1" "$l5" "$cores" "$up" "$extra"
+  sleep 55
+done
+EOF
+  chmod 755 "$CRON_LIB/status.sh"
+
+  cat > /etc/systemd/system/loghub-status.service <<'EOF'
+[Unit]
+Description=loghub: stan uslug i zuzycie zasobow
+After=systemd-journald.service docker.service
+
+[Service]
+ExecStart=/usr/local/lib/loghub/status.sh
+SyslogIdentifier=loghub-status
+Restart=always
+RestartSec=10
+Nice=10
+
+[Install]
+WantedBy=multi-user.target
+EOF
+}
+
+setup_status() {
+  [ "$DO_STATUS" = 1 ] || return 0
+  have journalctl && have systemctl || return 0
+  say "Wlaczam pomiar zasobow i stanu uslug"
+  write_status_files
+  systemctl daemon-reload
+  systemctl enable loghub-status >/dev/null 2>&1 || true
+  systemctl restart loghub-status
+  JSON_VRL=1
 }
 
 fan_out_lxc() {
@@ -533,7 +614,7 @@ fan_out_lxc() {
     pct exec "$id" -- mkdir -p "$(dirname "$SELF")" </dev/null
     pct push "$id" "$SELF" "$SELF" --perms 755 </dev/null >/dev/null
     pct exec "$id" -- "$SELF" agent --hub "$HUB_LAN" --token "$TOKEN" \
-      --no-lxc --no-tailscale </dev/null || warn "LXC $id: instalacja nieudana"
+      --no-lxc --no-tailscale $( [ "$DO_CRON" = 1 ] || echo --no-cron ) $( [ "$DO_STATUS" = 1 ] || echo --no-status ) </dev/null || warn "LXC $id: instalacja nieudana"
   done
   local stopped vms
   stopped="$(pct list 2>/dev/null | awk 'NR>1 && $2!="running" {printf "%s ", $1}')"
@@ -544,7 +625,7 @@ fan_out_lxc() {
 }
 
 cmd_agent() {
-  HUB="" HUB_LAN="" TOKEN="" NAME="$(hostname)" EXTRA_LOGS="" DO_LXC=1 USE_TS=1 DO_CRON=1 CRON_VRL=0
+  HUB="" HUB_LAN="" TOKEN="" NAME="$(hostname)" EXTRA_LOGS="" DO_LXC=1 USE_TS=1 DO_CRON=1 DO_STATUS=1 JSON_VRL=0
   while [ $# -gt 0 ]; do
     case "$1" in
       --hub) HUB="${2%/}"; shift 2 ;;
@@ -555,6 +636,7 @@ cmd_agent() {
       --no-lxc) DO_LXC=0; shift ;;
       --no-tailscale) USE_TS=0; shift ;;
       --no-cron) DO_CRON=0; shift ;;
+      --no-status) DO_STATUS=0; shift ;;
       *) die "nieznana opcja: $1" ;;
     esac
   done
@@ -580,11 +662,12 @@ cmd_agent() {
   done
 
   setup_cron
+  setup_status
   write_vector_config
-  if [ "$CRON_VRL" = 1 ] && ! vector validate --no-environment /etc/vector/vector.yaml >/dev/null 2>&1; then
-    # czesc dla crona nie moze zablokowac zbierania zwyklych logow
-    warn "$NAME: konfiguracja z zadaniami cron nie przeszla walidacji - instaluje bez niej"
-    CRON_VRL=0
+  if [ "$JSON_VRL" = 1 ] && ! vector validate --no-environment /etc/vector/vector.yaml >/dev/null 2>&1; then
+    # czesc dla crona i zasobow nie moze zablokowac zbierania zwyklych logow
+    warn "$NAME: konfiguracja z cronem i zasobami nie przeszla walidacji - instaluje bez niej"
+    JSON_VRL=0
     write_vector_config
   fi
   vector validate --no-environment /etc/vector/vector.yaml >/dev/null \
@@ -609,8 +692,8 @@ cmd_uninstall_agent() {
   systemctl disable --now vector >/dev/null 2>&1 || true
   apt-get remove -y -qq vector >/dev/null 2>&1 || true
   rm -rf /etc/vector/vector.yaml /var/lib/vector
-  systemctl disable --now loghub-cron >/dev/null 2>&1 || true
-  rm -rf /etc/systemd/system/loghub-cron.service "$CRON_LIB"
+  systemctl disable --now loghub-cron loghub-status >/dev/null 2>&1 || true
+  rm -rf /etc/systemd/system/loghub-cron.service /etc/systemd/system/loghub-status.service "$CRON_LIB"
   if [ -f /etc/default/cron ] && grep -q '^# loghub$' /etc/default/cron; then
     sed -i '/^# loghub$/,+1d' /etc/default/cron
     systemctl restart cron >/dev/null 2>&1 || true

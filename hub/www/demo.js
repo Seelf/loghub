@@ -195,6 +195,43 @@
   }
 
   const ndjson = a => a.map(o => JSON.stringify(o)).join('\n') + '\n';
+
+  // ---------------------------------------------------------- stan i zasoby
+  // [host, rdzenie, RAM GB, dysk GB, bazowe CPU %, bazowe RAM %, dysk %]
+  const HOSTS = [['pve', 4, 16, 240, 14, 62, 41], ['vps', 2, 4, 80, 9, 71, 58], ['media', 4, 6, 512, 22, 48, 91], ['loghub', 2, 2, 16, 4, 38, 22]];
+  const EXTRA_CT = { media: [{ n: 'tdarr', s: 'exited', st: 'Exited (137) 3 hours ago' }, { n: 'homepage', s: 'exited', st: 'Exited (0) 2 days ago' }, { n: 'seerr', s: 'running', st: 'Up 5 hours (unhealthy)' }] };
+  const FAILED = { vps: ['fail2ban.service'] };
+  const GUESTS = [[100, 'homeassistant', 'qemu', 'running', 2, 4], [101, 'media', 'lxc', 'running', 4, 6], [102, 'adguard', 'lxc', 'running', 1, 0.5],
+    [105, 'backup', 'lxc', 'stopped', 1, 1], [110, 'loghub', 'lxc', 'running', 2, 2], [111, 'nginxproxymanager', 'lxc', 'running', 1, 1]];
+  const wave = (h, t, base, amp) => Math.max(0.3, Math.min(99, base + amp * Math.sin((new Date(t).getHours() - 8) / 24 * 2 * Math.PI) + (noise(h, Math.floor(t / 6e4)) - 0.5) * amp));
+
+  function statRec(hi, t) {
+    const [host, cores, ram, disk, cpu0, mem0, dsk] = HOSTS[hi], cpu = wave(hi + 1, t, cpu0, cpu0 * 0.6), mem = wave(hi + 9, t, mem0, 4);
+    const o = { _time: new Date(t).toISOString(), _stream: '{host="' + host + '",source="stat",unit="host"}', host, source: 'stat', unit: 'host', level: '6',
+      cpu: cpu.toFixed(1), mem_pct: mem.toFixed(1), mem_total_kb: String(ram * 1048576), mem_avail_kb: String(Math.round(ram * 1048576 * (1 - mem / 100))),
+      disk_pct: String(dsk), disk_total_kb: String(disk * 1048576), disk_used_kb: String(Math.round(disk * 1048576 * dsk / 100)), load1: (cpu / 100 * cores).toFixed(2), cores: String(cores) };
+    o._msg = 'CPU ' + o.cpu + '% · RAM ' + o.mem_pct + '% · dysk ' + dsk + '% · obciążenie ' + o.load1;
+    const cts = U.filter(u => u[0] === host && u[1] === 'docker').map(u => ({ n: u[2], s: 'running', st: 'Up 2 days' })).concat(EXTRA_CT[host] || []);
+    if (cts.length) {
+      o.containers = JSON.stringify(cts);
+      o.cstats = JSON.stringify(cts.filter(c => c.s === 'running').map((c, i) => {
+        const cp = Math.max(0.01, noise(i + 31, Math.floor(t / 6e4)) * (c.n === 'jellyfin' ? 60 : c.n === 'qbittorrent' ? 25 : 4)), mb = 40 + Math.round(noise(i + 5, 1) * 700);
+        return { n: c.n, cpu: cp.toFixed(2) + '%', mem: mb + 'MiB / ' + ram + 'GiB', memp: (mb / ram / 10.24).toFixed(2) + '%' };
+      }));
+    }
+    const units = U.filter(u => u[0] === host && u[1] === 'journald' && /\.service$/.test(u[2])).map(u => [u[2], 'active', 'running']);
+    for (const f of FAILED[host] || []) units.push([f, 'failed', 'failed']);
+    o.units = JSON.stringify(units);
+    if (host === 'pve') o.guests = JSON.stringify(GUESTS.map(([vmid, name, type, status, maxcpu, gbm], i) => ({
+      id: type + '/' + vmid, vmid, name, type, status, maxcpu, maxmem: gbm * 1073741824, mem: status === 'running' ? Math.round(gbm * 1073741824 * (0.3 + noise(i, 2) * 0.5)) : 0,
+      cpu: status === 'running' ? noise(i + 3, Math.floor(t / 6e4)) * 0.35 : 0, maxdisk: 32 * 1073741824, disk: Math.round(32 * 1073741824 * (0.2 + noise(i, 9) * 0.6)) })));
+    return o;
+  }
+  function statHistory() {
+    const step = 30 * 6e4, end = Math.floor(Date.now() / step) * step, out = [];
+    HOSTS.forEach((x, hi) => { for (let k = 0; k < 48; k++) { const t = end - k * step, o = statRec(hi, t); out.push({ host: x[0], _time: new Date(t).toISOString(), cpu: o.cpu, mem: o.mem_pct }); } });
+    return out;
+  }
   let user = { user: 'admin', role: 'admin' };
 
   window.loghubDemo = {
@@ -202,6 +239,10 @@
       const q = String(body.get('query') || '');
       if (path === 'hits') return new Response(JSON.stringify(hits(body)));
       if (path === 'query') {
+        if (q.includes('source="stat"')) {
+          if (q.includes('| stats')) return new Response(ndjson(statHistory()));
+          return new Response(ndjson(HOSTS.map((x, hi) => statRec(hi, Date.now() - 20e3))));
+        }
         if (q.includes('"crondef"')) {
           const defs = U.filter(u => u[1] === 'cron').map(u => ({ host: u[0], unit: u[2], s: u[5].s, f: u[5].f, u: u[5].u })).concat(NEVER);
           return new Response(ndjson(defs.map(x => ({ _time: new Date(Date.now() - 3 * H).toISOString(), host: x.host, source: 'crondef', unit: x.unit, cron_sched: x.s, cron_file: x.f, cron_user: x.u, cron_cmd: x.unit, cron_scan: '1' }))));

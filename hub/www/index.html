@@ -26,6 +26,7 @@ h1{font-size:22px;margin:0;font-weight:650;text-wrap:balance}
 .num{font-variant-numeric:tabular-nums}
 .dot{width:8px;height:8px;border-radius:50%;background:var(--mut);opacity:.5;flex:none;display:inline-block}
 .dot.up{background:var(--acc);opacity:1}
+.dot.bad{background:var(--err);opacity:1}
 .chip{display:inline-flex;align-items:center;gap:5px;font-size:11px;padding:1px 8px;border:1px solid var(--line);border-radius:10px;color:var(--mut);white-space:nowrap}
 .chip.ok{color:var(--acc);border-color:var(--acc)}
 .chip.bad{color:var(--err);border-color:var(--err);background:var(--errbg)}
@@ -34,6 +35,7 @@ h1{font-size:22px;margin:0;font-weight:650;text-wrap:balance}
 .sp{display:flex;align-items:flex-end;gap:1px;height:30px}
 .sp i{flex:1;min-height:2px;background:var(--acc);border-radius:1px}
 .sp i.z{background:var(--line)}
+.sp i.e{background:var(--err)}
 
 /* logowanie */
 #login{height:100%;display:flex;align-items:center;justify-content:center;padding:16px}
@@ -114,12 +116,27 @@ main{flex:1;min-width:0;display:flex;flex-direction:column}
 .vol span{font-variant-numeric:tabular-nums;width:44px;flex:none;text-align:right}
 #errs{border:1px solid var(--line);border-radius:12px;background:var(--card);padding:6px 0;font:12px/1.55 var(--mono)}
 #errs .r{cursor:pointer}
+.meters{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.mt{display:flex;flex-direction:column;gap:3px;min-width:0}
+.mt .row b{font-size:15px;font-variant-numeric:tabular-nums;margin-left:auto}
+.mt small{font-size:11px;color:var(--mut);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.bar{height:5px;border-radius:3px;background:var(--line);overflow:hidden}
+.bar i{display:block;height:100%;background:var(--acc)}
+.bar i.w{background:var(--warn)}.bar i.e{background:var(--err)}
+.probs{display:flex;flex-wrap:wrap;gap:5px}
+.guests{display:flex;flex-direction:column;gap:3px;border-top:1px solid var(--line);padding-top:8px}
+.guests>div{display:grid;grid-template-columns:12px 1fr 52px 96px;gap:8px;align-items:center;font-size:12px}
+.guests span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.guests .num{text-align:right}
+#rtbl{border:1px solid var(--line);border-radius:12px;background:var(--card);overflow-x:auto;margin-top:10px}
+#rtbl .tr{grid-template-columns:minmax(160px,1.6fr) 90px minmax(90px,1fr) minmax(130px,1.2fr) minmax(150px,1.4fr) minmax(140px,1.4fr);min-width:820px}
+#rtbl .tr{cursor:default}
 #cronv{flex:1;overflow:auto;padding:18px 22px 28px;display:flex;flex-direction:column;gap:16px}
 #cronv>header{display:flex;align-items:flex-start;gap:10px}
 #ctools{display:flex;flex-wrap:wrap;gap:8px}
 #cs{flex:1 1 200px}
 #ctbl{border:1px solid var(--line);border-radius:12px;background:var(--card);overflow-x:auto}
-#ctbl .tr{grid-template-columns:118px minmax(220px,2.4fr) minmax(70px,.8fr) 116px 150px 44px 172px;min-width:940px}
+#ctbl .tr{grid-template-columns:118px minmax(220px,2.2fr) minmax(70px,.8fr) minmax(170px,1.3fr) 150px 44px 172px;min-width:1000px}
 #ctbl .tr>:first-child{font-family:var(--sans)}
 .job{display:flex;flex-direction:column;min-width:0}
 .job b{font:400 12px var(--mono);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -205,7 +222,7 @@ mark{background:var(--hl);color:inherit;border-radius:2px}
   <section id="over">
     <header><button class="tog" data-tog title="Pokaż lub ukryj panel">☰</button><div><h1>Przegląd</h1><div class="mut">Stan serwerów i źródeł logów z ostatnich 24 godzin.</div></div></header>
     <div id="tiles" class="tiles"></div>
-    <div id="tabs"><button data-tab="hosts" class="on">Serwery</button><button data-tab="units">Źródła</button><button data-tab="errs">Ostatnie błędy</button></div>
+    <div id="tabs"><button data-tab="hosts" class="on">Serwery</button><button data-tab="units">Źródła</button><button data-tab="res">Zasoby</button><button data-tab="errs">Ostatnie błędy</button></div>
     <div id="cards"></div>
     <div id="units" hidden>
       <div id="tools">
@@ -216,6 +233,14 @@ mark{background:var(--hl);color:inherit;border-radius:2px}
       <div id="tbl" style="margin-top:10px"></div>
     </div>
     <div id="errs" hidden></div>
+    <div id="resv" hidden>
+      <div id="rtools" style="display:flex;flex-wrap:wrap;gap:8px">
+        <input id="rs" placeholder="szukaj maszyny, kontenera lub usługi" aria-label="Szukaj" style="flex:1 1 200px">
+        <select id="rsort" aria-label="Sortuj według"><option value="cpu">CPU</option><option value="ram">RAM</option><option value="name">nazwa</option></select>
+        <select id="rtype" aria-label="Rodzaj"><option value="">wszystko</option><option value="host">maszyny</option><option value="ct">kontenery Docker</option><option value="guest">LXC i VM (Proxmox)</option></select>
+      </div>
+      <div id="rtbl"></div>
+    </div>
   </section>
 
   <section id="cronv" hidden>
@@ -234,6 +259,7 @@ mark{background:var(--hl);color:inherit;border-radius:2px}
       <div id="title"></div>
       <div class="stat"><div><div class="lbl">Linie / min</div><b id="rate">–</b></div><div class="sp" id="rsp"></div></div>
       <div class="stat"><div><div class="lbl">Błędy 24 h</div><b id="e24">–</b></div></div>
+      <div class="stat" id="resbox" hidden><div><div class="lbl" id="reslbl">Zasoby</div><b id="resval">–</b></div></div>
       <button id="live" aria-pressed="true"><i class="dot"></i><span>Na żywo</span></button>
     </div>
     <div id="bar">
@@ -256,8 +282,10 @@ const $=s=>document.querySelector(s),MAX=5000,LIMIT=1000,ALL='*',H=36e5,F=['host
 const ERR='(level:<=3 OR (level:"" (i(error) OR i(err) OR i(fatal) OR i(panic) OR i(failed) OR i(critical))))';
 const WARN='(level:4 OR (level:"" (i(warn) OR i(warning) OR i(wrn))))';
 const SRC={journald:'systemd',docker:'docker',file:'pliki',cron:'cron'};
+// rekordy techniczne agenta (stan i zasoby, lista zadan cron) nie sa zwyklymi logami
+const EXCL='NOT source:=stat NOT source:=crondef';
 const log=$('#log'),tree=$('#tree'),jump=$('#jump'),pos=$('#pos'),demo=()=>window.loghubDemo;
-let me=null,D={units:[],hosts:new Map()},C=[],cur=null,ctl=null,live=true,seen=new Set(),fresh=0,word='',view='over',tab='hosts',started=false;
+let me=null,D={units:[],hosts:new Map(),stat:new Map(),hist:new Map()},C=[],cur=null,ctl=null,live=true,seen=new Set(),fresh=0,word='',view='over',tab='hosts',started=false;
 
 const quote=v=>JSON.stringify(String(v));
 const short=u=>String(u||'').replace(/^\/var\/log\//,'').replace(/\.service$/,'');
@@ -341,28 +369,106 @@ async function refresh(){
   if(!me)return;
   try{
     const now=Date.now();
-    const [all,er,wa,up]=await Promise.all([
-      hits('*',now-168*H,H,F),
+    const [all,er,wa,up,st]=await Promise.all([
+      hits(EXCL,now-168*H,H,F),
       hits(ERR,now-24*H,H,F).catch(()=>[]),
       hits(WARN,now-24*H,H,F).catch(()=>[]),
-      api('query',{query:'_time:5m | stats by (host, source, unit) count() c'}).then(r=>r.text()).then(t=>new Set(parseLines(t).map(key))).catch(()=>null)]);
+      api('query',{query:'_time:5m '+EXCL+' | stats by (host, source, unit) count() c'}).then(r=>r.text()).then(t=>new Set(parseLines(t).map(key))).catch(()=>null),
+      api('query',{query:'{source="stat"} _time:10m',limit:500}).then(r=>r.text()).then(parseLines).catch(()=>[])]);
+    D.stat=readStat(st);
     const E=new Map(er.map(h=>[key(h.f),h])),W=new Map(wa.map(h=>[key(h.f),h]));
-    D.units=all.filter(h=>h.f.host&&h.f.source!=='crondef').map(h=>{
+    D.units=all.filter(h=>h.f.host&&h.f.source!=='crondef'&&h.f.source!=='stat').map(h=>{
       const f=h.f,k=key(f),ev=E.has(k)?last24(E.get(k).v):null,li=h.v.findLastIndex(x=>x>0),isUp=up?up.has(k):li>=h.v.length-1;
       return {host:f.host,source:f.source||'?',unit:f.unit||'?',k,c7:h.total,v:last24(h.v),c24:sum(last24(h.v)),ev,e24:ev?sum(ev):0,
         w24:W.has(k)?sum(last24(W.get(k).v)):0,up:isUp,last:isUp?now:li<0?0:Math.min(now,h.t0+(li+1)*H)};
     });
-    for(const u of D.units)u.sel=selOf(u);
+    // kontenery bez logow i padniete uslugi tez maja byc widoczne
+    for(const [host,s] of D.stat){
+      const have=new Set(D.units.filter(u=>u.host===host).map(u=>u.source+'\n'+u.unit));
+      const add=(source,unit)=>{if(!have.has(source+'\n'+unit))D.units.push({host,source,unit,k:host+'\n'+source+'\n'+unit,c7:0,v:new Array(24).fill(0),c24:0,ev:null,e24:0,w24:0,up:false,last:0})};
+      for(const c of s.cmap.keys())add('docker',c);
+      for(const [n,x] of s.umap)if(x[1]==='failed')add('journald',n);
+    }
+    for(const u of D.units){u.sel=selOf(u);[u.st,u.stt]=ustate(u)}
     D.hosts=new Map();
     for(const u of D.units){
       const h=D.hosts.get(u.host)||D.hosts.set(u.host,{name:u.host,units:[],c24:0,e24:0,w24:0,up:false,last:0,v:new Array(24).fill(0),ev:new Array(24).fill(0)}).get(u.host);
       h.units.push(u);h.c24+=u.c24;h.e24+=u.e24;h.w24+=u.w24;h.up=h.up||u.up;h.last=Math.max(h.last,u.last);
+      if(u.st==='bad')(h.bad=h.bad||[]).push(u);
       u.v.forEach((x,i)=>{h.v[i]+=x});if(u.ev)u.ev.forEach((x,i)=>{h.ev[i]+=x});
     }
-    renderTree();renderOver();loadCron();
+    // serwer jest online, gdy agent przyslal stan w ciagu 3 minut (gdy brak pomiarow: gdy pisze logi)
+    for(const h of D.hosts.values()){const s=D.stat.get(h.name);h.bad=h.bad||[];if(s){h.up=now-s.t<3*6e4;h.last=Math.max(h.last,s.t)}}
+    renderTree();renderOver();loadCron();loadHist();
     if(view==='logs')headStats();
     if(!D.units.length)status('Brak logów z ostatnich 7 dni. Zainstaluj agenta na pierwszej maszynie.');
   }catch(e){status('Nie udało się odświeżyć listy źródeł: '+e.message)}
+}
+
+// ------------------------------------------------------------ stan i zasoby
+const pj=x=>{if(Array.isArray(x))return x;try{const v=JSON.parse(x||'[]');return Array.isArray(v)?v:[]}catch{return []}};
+const fnum=x=>{const v=parseFloat(String(x??'').replace(',','.'));return isNaN(v)?null:v};
+function readStat(rows){
+  const m=new Map();
+  for(const o of rows){
+    const t=Date.parse(o._time);if(!o.host||(m.has(o.host)&&m.get(o.host).t>=t))continue;
+    const cs=new Map(pj(o.cstats).map(c=>[c.n,c]));
+    m.set(o.host,{t,o,cpu:fnum(o.cpu),mem:fnum(o.mem_pct),disk:fnum(o.disk_pct),cores:+o.cores||1,load:fnum(o.load1),
+      memT:+o.mem_total_kb||0,memA:+o.mem_avail_kb||0,diskU:+o.disk_used_kb||0,diskT:+o.disk_total_kb||0,
+      cmap:new Map(pj(o.containers).map(c=>[c.n,Object.assign({},c,cs.get(c.n)||{})])),
+      umap:new Map(pj(o.units).map(x=>[x[0],x])),guests:pj(o.guests)});
+  }
+  return m;
+}
+// stan kontenera lub uslugi: 'up' dziala, 'down' zatrzymane bez bledu, 'bad' padlo; null gdy nie wiadomo
+function cstate(c){
+  if(c.s==='running')return /unhealthy/.test(c.st)?['bad','działa, ale nie przechodzi kontroli zdrowia']:['up','działa'+(/healthy/.test(c.st)?', zdrowy':'')];
+  if(c.s==='restarting')return ['bad','ciągle się restartuje'];
+  if(c.s==='exited')return /Exited \(0\)/.test(c.st)?['down','zatrzymany']:['bad','padł: '+c.st];
+  if(c.s==='paused')return ['down','wstrzymany'];
+  return ['down',c.st||c.s||'nie działa'];
+}
+function ustate(u){
+  const s=D.stat.get(u.host);
+  if(!s)return [null,''];
+  if(u.source==='docker'){const c=s.cmap.get(u.unit);return c?cstate(c):[null,'']}
+  if(u.source==='journald'&&/\.service$/.test(u.unit)){
+    const x=s.umap.get(u.unit);
+    if(!x)return ['down','nieaktywna (zakończona albo zatrzymana)'];
+    return x[1]==='failed'?['bad','padła (failed)']:x[1]==='active'?['up','działa'+(x[2]==='exited'?' (jednorazowa, zakończona)':'')]:['up',x[1]+' / '+x[2]];
+  }
+  return [null,''];
+}
+const dotc=st=>'dot'+(st==='up'?' up':st==='bad'?' bad':'');
+const gb=kb=>dec(kb/1048576)+' GB';
+const pc=v=>v==null?'–':dec(v)+'%';
+const lvlc=v=>v>=90?'e':v>=75?'w':'';
+function meter(label,v,sub){
+  const m=el('div','mt'),r=el('div','row'),b=el('div','bar'),i=el('i',lvlc(v||0));
+  i.style.width=Math.min(100,Math.max(0,v||0))+'%';b.append(i);
+  r.append(el('span','lbl',label),el('b','',pc(v)));const s=el('small','',sub||'');s.title=sub||'';m.append(r,b,s);return m;
+}
+// srednie CPU i RAM z ostatnich 24 h, w kubelkach po 30 min
+async function loadHist(){
+  try{
+    const rows=parseLines(await(await api('query',{query:'{source="stat"} _time:24h | stats by (host, _time:30m) avg(cpu) cpu, avg(mem_pct) mem'})).text());
+    const step=30*6e4,end=Math.floor(Date.now()/step)*step,m=new Map();
+    for(const o of rows){
+      const k=47-Math.round((end-Date.parse(o._time))/step);if(k<0||k>47)continue;
+      const x=m.get(o.host)||m.set(o.host,{cpu:new Array(48).fill(null),mem:new Array(48).fill(null)}).get(o.host);
+      x.cpu[k]=fnum(o.cpu);x.mem[k]=fnum(o.mem);
+    }
+    D.hist=m;renderOver();
+  }catch{}
+}
+function sparkPct(box,v,stepMs){
+  box.textContent='';const end=Date.now();
+  v.forEach((x,i)=>{
+    const b=el('i',x==null?'z':lvlc(x)==='e'?'e':'');b.style.height=x==null?'':Math.max(6,Math.round(x))+'%';
+    if(lvlc(x||0)==='w')b.style.background='var(--warn)';
+    const d=new Date(end-(v.length-1-i)*stepMs);b.title=pad(d.getHours())+':'+pad(d.getMinutes())+' · CPU '+(x==null?'brak pomiaru':pc(x));
+    box.append(b);
+  });
 }
 
 function spark(box,v,ev,stepMs){
@@ -378,7 +484,7 @@ function spark(box,v,ev,stepMs){
 // --------------------------------------------------------------- panel boczny
 function item(label,sel,meta,u){
   const it=el('div','it');it.dataset.sel=sel;it.dataset.k=meta.k;it.tabIndex=0;it.setAttribute('role','button');
-  if(u&&u.source!=='cron'){const d=el('i','dot'+(u.up?' up':''));d.title=u.up?'pisze logi':'cisza od 5 minut';it.append(d)}
+  if(u){const d=el('i',dotc(u.st));if(!u.st)d.style.visibility='hidden';d.title=u.stt;it.append(d)}
   const n=el('span','',label);n.title=meta.title||label;it.append(n);
   if(u&&u.e24){const c=el('span','chip bad',num(u.e24));c.title='błędy w 24 h';it.append(c)}
   if(u)it.append(el('small','',num(u.c24)));
@@ -392,7 +498,7 @@ function renderTree(){
   tree.textContent='';
   for(const h of [...D.hosts.values()].sort((a,b)=>a.name.localeCompare(b.name))){
     const d=el('details');d.dataset.h=h.name;d.open=first||open.has(h.name);
-    const sm=el('summary'),dot=el('i','dot'+(h.up?' up':''));dot.title=h.up?'wysyła logi':'brak logów od 5 minut';
+    const sm=el('summary'),dot=el('i','dot'+(h.up?(h.bad.length?' bad':' up'):''));dot.title=h.up?(h.bad.length?h.bad.length+' usług z problemem':'agent działa'):'brak kontaktu z agentem';
     sm.append(dot,h.name,el('small','',num(h.c24)));d.append(sm);
     d.append(item('cały serwer','{host='+quote(h.name)+'}',{k:h.name.toLowerCase(),title:h.name,host:h.name,multi:true}));
     for(const src of [...new Set(h.units.map(u=>u.source))].sort()){
@@ -419,15 +525,40 @@ function show(v){view=v;$('#over').hidden=v!=='over';$('#logs').hidden=v!=='logs
 
 // -------------------------------------------------------------------- przeglad
 function renderOver(){
-  const hs=[...D.hosts.values()],us=D.units,upH=hs.filter(h=>h.up).length,live=us.filter(u=>u.source!=='cron'),upU=live.filter(u=>u.up).length,e=sum(us.map(u=>u.e24)),w=sum(us.map(u=>u.w24));
+  const hs=[...D.hosts.values()],us=D.units,upH=hs.filter(h=>h.up).length,bad=us.filter(u=>u.st==='bad').length,e=sum(us.map(u=>u.e24)),w=sum(us.map(u=>u.w24));
   const tiles=$('#tiles');tiles.textContent='';
-  for(const [v,l,c] of [[num(sum(us.map(u=>u.c24))),'linii w 24 h',''],[num(e),'błędów',e?'e':''],[num(w),'ostrzeżeń',w?'w':''],[upH+' / '+hs.length,'serwerów online',upH<hs.length?'w':'g'],[upU+' / '+live.length,'źródeł aktywnych','']]){
+  for(const [v,l,c] of [[num(sum(us.map(u=>u.c24))),'linii w 24 h',''],[num(e),'błędów',e?'e':''],[num(w),'ostrzeżeń',w?'w':''],[upH+' / '+hs.length,'serwerów online',upH<hs.length?'w':'g'],[bad,'usług z problemem',bad?'e':'g']]){
     const d=el('div',c);d.append(el('b','',v),el('span','mut',l));tiles.append(d);
   }
   const cards=$('#cards');cards.textContent='';
-  for(const h of hs.sort((a,b)=>a.up-b.up||b.e24-a.e24||a.name.localeCompare(b.name))){
+  for(const h of hs.sort((a,b)=>a.up-b.up||b.bad.length-a.bad.length||b.e24-a.e24||a.name.localeCompare(b.name))){
     const c=el('div','card'+(h.up?'':' off')),hd=el('header');
-    hd.append(el('i','dot'+(h.up?' up':'')),el('b','',h.name),el('span','chip '+(h.up?'ok':'wrn'),h.up?'online':'milczy: '+rel(h.last)));
+    hd.append(el('i','dot'+(h.up?(h.bad.length?' bad':' up'):'')),el('b','',h.name),el('span','chip '+(!h.up?'wrn':h.bad.length?'bad':'ok'),!h.up?'milczy: '+rel(h.last):h.bad.length?h.bad.length+' z problemem':'online'));
+    const s=D.stat.get(h.name),res=[];
+    if(s){
+      const ms=el('div','meters');
+      ms.append(meter('CPU',s.cpu,s.cores+' rdz., obc. '+(s.load==null?'–':dec(s.load))),meter('RAM',s.mem,s.memT?gb(s.memT-s.memA)+' / '+gb(s.memT):''),meter('Dysk /',s.disk,s.diskT?gb(s.diskU)+' / '+gb(s.diskT):''));
+      res.push(ms);
+      const hi=D.hist.get(h.name);
+      if(hi){const r2=el('div','row');r2.append(el('span','lbl','CPU 24 h'),el('span','num mut','śr. '+pc(sum(hi.cpu.filter(x=>x!=null))/Math.max(1,hi.cpu.filter(x=>x!=null).length))));const sp2=el('div','sp');sparkPct(sp2,hi.cpu,30*6e4);res.push(r2,sp2)}
+    }
+    if(h.bad.length){
+      const pr=el('div','probs');
+      for(const u of h.bad.slice(0,6)){const b=el('button','chip bad',short(u.unit));b.title=u.stt;b.onclick=()=>pick(u.sel,{title:short(u.unit),host:u.host,source:u.source,unit:u.unit},'');pr.append(b)}
+      if(h.bad.length>6)pr.append(el('span','chip bad','+'+(h.bad.length-6)));
+      res.push(pr);
+    }
+    if(s&&s.guests.length){
+      const g=el('div','guests');g.append(el('span','lbl','Kontenery LXC i VM na tym Proxmoxie'));
+      const gs=s.guests.slice().sort((a,b)=>(b.status==='running')-(a.status==='running')||(b.cpu||0)-(a.cpu||0));
+      for(const x of gs.slice(0,8)){
+        const r3=el('div'),on=x.status==='running';
+        r3.append(el('i','dot'+(on?' up':'')),el('span','',(x.name||x.id)+' · '+(x.type==='qemu'?'VM':'LXC')+' '+(x.vmid||'')),el('span','num',on?pc((x.cpu||0)*100):'–'),el('span','num mut',on&&x.maxmem?gb(x.mem/1024)+' / '+gb(x.maxmem/1024):x.status||''));
+        r3.title=on?'CPU liczone od przydzielonych rdzeni ('+(x.maxcpu||'?')+')':'zatrzymany';g.append(r3);
+      }
+      if(gs.length>8)g.append(el('span','mut','+'+(gs.length-8)+' więcej w zakładce Zasoby'));
+      res.push(g);
+    }
     const r=el('div','row');r.append(el('span','lbl','Aktywność 24 h'),el('span','num mut',num(h.c24)+' linii'));
     const sp=el('div','sp');spark(sp,h.v,h.ev,H);
     const types=el('div','mut',[...new Set(h.units.map(u=>u.source))].sort().map(s=>h.units.filter(u=>u.source===s).length+' '+(SRC[s]||s)).join(' · '));
@@ -439,9 +570,9 @@ function renderOver(){
     const meta={title:h.name,host:h.name,multi:true};
     b1.onclick=()=>pick('{host='+quote(h.name)+'}',meta,'');
     b2.onclick=()=>pick('{host='+quote(h.name)+'}',meta,'e','1d');b2.disabled=!h.e24;
-    ft.append(b1,b2);c.append(hd,r,sp,types,kv,ft);cards.append(c);
+    ft.append(b1,b2);c.append(hd,...res,r,sp,types,kv,ft);cards.append(c);
   }
-  renderUnits();
+  renderUnits();renderRes();
   if(tab==='errs')loadErrs();
 }
 function renderUnits(){
@@ -451,7 +582,7 @@ function renderUnits(){
   tbl.textContent='';
   const hd=el('div','tr h');for(const x of ['Źródło','Serwer','Typ','Linie 24 h','Błędy','Ostrz.','Ostatni log'])hd.append(el('span','',x));tbl.append(hd);
   for(const u of us){
-    const r=el('div','tr'),n=el('span'),dt=el('i','dot'+(u.up?' up':''));if(u.source==='cron')dt.style.visibility='hidden';n.append(dt,el('span','',short(u.unit)));n.title=u.unit;
+    const r=el('div','tr'),n=el('span'),dt=el('i',dotc(u.st));if(!u.st)dt.style.visibility='hidden';dt.title=u.stt;n.append(dt,el('span','',short(u.unit)));n.title=u.unit;
     const vol=el('span','vol'),bar=el('i');bar.style.width=Math.round(u.c24/max*100)+'%';vol.append(el('span','',num(u.c24)),bar);
     const e=el('span');if(u.e24)e.append(el('span','chip bad',num(u.e24)));else e.textContent='–';
     const w=el('span');if(u.w24)w.append(el('span','chip wrn',num(u.w24)));else w.textContent='–';
@@ -473,10 +604,41 @@ async function loadErrs(){
 }
 for(const b of document.querySelectorAll('#tabs button'))b.onclick=()=>{
   tab=b.dataset.tab;for(const x of document.querySelectorAll('#tabs button'))x.classList.toggle('on',x===b);
-  $('#cards').hidden=tab!=='hosts';$('#units').hidden=tab!=='units';$('#errs').hidden=tab!=='errs';
+  $('#cards').hidden=tab!=='hosts';$('#units').hidden=tab!=='units';$('#errs').hidden=tab!=='errs';$('#resv').hidden=tab!=='res';
   if(tab==='errs')loadErrs();
 };
 $('#us').oninput=$('#usort').onchange=$('#udir').onchange=renderUnits;
+
+// zakladka Zasoby: maszyny, kontenery Docker, goscie Proxmoxa
+function renderRes(){
+  const rows=[];
+  for(const [host,s] of D.stat){
+    const hh=D.hosts.get(host),on=hh?hh.up:true;
+    rows.push({type:'host',name:host,kind:'maszyna',where:'',st:on?(hh&&hh.bad.length?'bad':'up'):'down',stt:on?'agent działa':'brak kontaktu',cpu:s.cpu,cpuT:pc(s.cpu)+' z '+s.cores+' rdz.',ram:s.mem,ramT:s.memT?gb(s.memT-s.memA)+' / '+gb(s.memT):'',note:'dysk '+pc(s.disk)+(s.load!=null?' · obc. '+dec(s.load):''),sel:'{host='+quote(host)+'}',meta:{title:host,host,multi:true}});
+    for(const c of s.cmap.values()){
+      const [st,stt]=cstate(c),cpu=fnum(c.cpu),ram=fnum(c.memp);
+      rows.push({type:'ct',name:c.n,kind:'Docker',where:host,st,stt,cpu,cpuT:cpu==null?'–':pc(cpu),ram,ramT:c.mem?String(c.mem).split('/')[0].trim():'',note:c.st||'',sel:selOf({host,source:'docker',unit:c.n}),meta:{title:c.n,host,source:'docker',unit:c.n}});
+    }
+    for(const g of s.guests){
+      const on=g.status==='running',cpu=on?(g.cpu||0)*100:null,ram=on&&g.maxmem?g.mem/g.maxmem*100:null;
+      rows.push({type:'guest',name:g.name||g.id,kind:g.type==='qemu'?'VM':'LXC',where:host+' · '+(g.vmid||''),st:on?'up':'down',stt:g.status||'',cpu,cpuT:cpu==null?'–':pc(cpu)+' z '+(g.maxcpu||'?')+' rdz.',ram,ramT:on&&g.maxmem?gb(g.mem/1024)+' / '+gb(g.maxmem/1024):'',note:on&&g.maxdisk?'dysk '+pc(g.disk/g.maxdisk*100):(g.status||'')});
+    }
+  }
+  const t=$('#rs').value.trim().toLowerCase(),ty=$('#rtype').value,by=$('#rsort').value,tbl=$('#rtbl');
+  const rs=rows.filter(r=>(!ty||r.type===ty)&&(!t||(r.name+' '+r.where).toLowerCase().includes(t)))
+    .sort((a,b)=>by==='name'?a.name.localeCompare(b.name):((b[by]??-1)-(a[by]??-1))||a.name.localeCompare(b.name));
+  tbl.textContent='';
+  const hd=el('div','tr h');for(const x of ['Nazwa','Rodzaj','Gdzie','CPU','RAM','Uwagi'])hd.append(el('span','',x));tbl.append(hd);
+  for(const r of rs){
+    const row=el('div','tr'),n=el('span'),d=el('i',dotc(r.st));d.title=r.stt;n.append(d,el('span','',r.name));n.title=r.name+' · '+r.stt;
+    const cell=(v,txt)=>{const c=el('span','vol'),b=el('i');b.style.width=Math.min(100,Math.max(1,v||0))+'%';if(lvlc(v||0))b.style.background=lvlc(v)==='e'?'var(--err)':'var(--warn)';c.append(el('span','',v==null?'–':pc(v)),b);c.title=txt;return c};
+    row.append(n,el('span','mut',r.kind),el('span','',r.where),cell(r.cpu,r.cpuT),cell(r.ram,r.ramT),el('span','mut',r.note));
+    if(r.sel){row.style.cursor='pointer';row.tabIndex=0;row.onclick=()=>pick(r.sel,r.meta,'');row.onkeydown=x=>{if(x.key==='Enter')row.onclick()}}
+    tbl.append(row);
+  }
+  if(!rs.length)tbl.append(el('div','n',D.stat.size?'Nic nie pasuje do filtra.':'Brak pomiarów. Zaktualizuj agentów (ta sama komenda instalacji), żeby zbierały zasoby.'));
+}
+$('#rs').oninput=$('#rsort').onchange=$('#rtype').onchange=renderRes;
 
 // ------------------------------------------------------------------ zadania cron
 // uruchomienia: zrodlo "cron" (jeden wpis na uruchomienie, z kodem wyjscia); lista zadan: zrodlo "crondef"
@@ -499,6 +661,39 @@ async function loadCron(){
   for(const j of C){j.last=j.runs[0]||null;j.bad=!!j.last&&j.last.cron_state!=='ok'}
   const bad=C.filter(j=>j.bad).length;$('#ncron').hidden=!bad;$('#ncron').textContent=bad;
   renderCron();
+}
+const DOWL=['niedziele','poniedziałki','wtorki','środy','czwartki','piątki','soboty','niedziele'],DOWG=['niedzieli','poniedziałku','wtorku','środy','czwartku','piątku','soboty','niedzieli'];
+const MONG=['stycznia','lutego','marca','kwietnia','maja','czerwca','lipca','sierpnia','września','października','listopada','grudnia'];
+function dowPl(x){
+  if(x==='1-5')return 'w dni robocze';
+  if(x==='0,6'||x==='6,0'||x==='6-7'||x==='6,7')return 'w weekendy';
+  if(/^[0-7](,[0-7])*$/.test(x))return 'w '+x.split(',').map(d=>DOWL[+d]).join(', ');
+  if(/^[0-7]-[0-7]$/.test(x)){const [a,b]=x.split('-');return 'od '+DOWG[a]+' do '+DOWG[b]}
+  return null;
+}
+// harmonogram crona po polsku; null, gdy wyrazenie jest zbyt nietypowe
+function cronPl(s){
+  const at={'@reboot':'przy starcie systemu','@hourly':'co godzinę','@daily':'codziennie o 00:00','@midnight':'codziennie o 00:00','@weekly':'w niedziele o 00:00','@monthly':'1. dnia miesiąca o 00:00','@yearly':'1 stycznia o 00:00','@annually':'1 stycznia o 00:00'};
+  if(!s)return null;
+  if(at[s])return at[s][0].toUpperCase()+at[s].slice(1);
+  const f=s.trim().split(/\s+/);if(f.length!==5)return null;
+  const [mi,ho,dm,mo,dw]=f,isN=x=>/^\d+$/.test(x);let when,days='';
+  if(mi==='*'&&ho==='*')when='co minutę';
+  else if(/^\*\/\d+$/.test(mi)&&ho==='*')when='co '+mi.slice(2)+' min';
+  else if(/^\d+-\d+\/\d+$/.test(mi)&&ho==='*'){const [r,st]=mi.split('/'),[a,b]=r.split('-');when='co '+st+' min (od '+a+'. do '+b+'. minuty)'}
+  else if(/^\d+(,\d+)+$/.test(mi)&&ho==='*')when='co godzinę, w minutach '+mi.split(',').join(', ');
+  else if(isN(mi)&&ho==='*')when=+mi?'co godzinę, w '+mi+'. minucie':'co pełną godzinę';
+  else if(isN(mi)&&/^\*\/\d+$/.test(ho))when='co '+ho.slice(2)+' godz., w '+mi+'. minucie';
+  else if(isN(mi)&&/^\d+(,\d+)*$/.test(ho))when='o '+ho.split(',').map(x=>pad(x)+':'+pad(mi)).join(' i ');
+  else if(isN(mi)&&/^\d+-\d+$/.test(ho)){const [a,b]=ho.split('-');when='co godzinę od '+pad(a)+':'+pad(mi)+' do '+pad(b)+':'+pad(mi)}
+  else return null;
+  if(dm==='*'&&mo==='*'&&dw==='*')days=when.startsWith('o ')?'codziennie':'';
+  else if(dm==='*'&&mo==='*'){days=dowPl(dw);if(!days)return null}
+  else if(/^\d+(,\d+)*$/.test(dm)&&mo==='*'&&dw==='*')days=dm.split(',').join(', ')+'. dnia miesiąca';
+  else if(isN(dm)&&isN(mo)&&dw==='*'&&+mo>=1&&+mo<=12)days=dm+' '+MONG[mo-1];
+  else return null;
+  const out=(days?days+' ':'')+when;
+  return out[0].toUpperCase()+out.slice(1);
 }
 const dur=s=>s==null||s===''?'':s<90?s+' s':s<5400?Math.round(s/60)+' min':dec(s/3600)+' godz.';
 function renderCron(){
@@ -523,7 +718,7 @@ function renderCron(){
     const code=el('span','num',L?String(L.exit_code??''):'–');if(j.bad)code.style.color='var(--err)';
     const hist=el('span','hist');
     for(const x of j.runs.slice().reverse()){const b=el('i',x.cron_state==='ok'?'':'e'),xd=new Date(x._time);b.title=fmt(xd)+' · '+(x.cron_state==='ok'?'OK':'kod '+x.exit_code)+(x.duration_s!=null?' · '+dur(x.duration_s):'');hist.append(b)}
-    const sch=el('span','num',d?d.cron_sched:'–');sch.style.fontFamily='var(--mono)';
+    const sch=el('span','job');if(d){const w=cronPl(d.cron_sched);sch.append(el('span','',w||d.cron_sched),el('small','',w?d.cron_sched:'nietypowy zapis'));sch.querySelector('small').style.fontFamily='var(--mono)'}else sch.append(el('span','mut','–'));
     r.append(st,job,el('span','',j.host),sch,when,code,hist);
     r.tabIndex=0;r.onclick=()=>pick(j.sel,{title:short(j.unit),host:j.host,source:'cron',unit:j.unit},'','30d');
     r.onkeydown=x=>{if(x.key==='Enter')r.onclick()};
@@ -539,8 +734,8 @@ function pick(sel,meta,lvl,range){
   if(lvl!=null)$('#lvl').value=lvl;
   if(range)$('#range').value=range;
   const t=$('#title');t.textContent='';
-  const us=matching(),up=us.some(u=>u.up);
-  t.append(el('i','dot'+(up?' up':'')),el('b','',meta.title));
+  const us=matching(),hh=meta.host?D.hosts.get(meta.host):null,st=meta.unit?(us[0]&&us[0].st):hh?(hh.up?(hh.bad.length?'bad':'up'):null):null;
+  t.append(el('i',dotc(st)),el('b','',meta.title));
   if(meta.unit)t.append(el('span','chip',meta.host),el('span','chip',SRC[meta.source]||meta.source));
   else t.append(el('span','chip',meta.host?'cały serwer · '+us.length+' źródeł':D.hosts.size+' serwerów · '+us.length+' źródeł'));
   show('logs');headStats();reload();
@@ -549,8 +744,14 @@ const matching=()=>!cur?[]:D.units.filter(u=>cur.sel===ALL||(cur.meta.unit?u.sel
 async function headStats(){
   if(!cur)return;
   const e=sum(matching().map(u=>u.e24)),eb=$('#e24');eb.textContent=num(e);eb.style.color=e?'var(--err)':'';
+  // zasoby: kontener Dockera albo caly serwer
+  const m=cur.meta,s=m.host?D.stat.get(m.host):null,box=$('#resbox');let lab='',val='';
+  if(s&&m.source==='docker'){const c=s.cmap.get(m.unit);if(c){lab='Kontener';val=c.cpu!=null&&c.cpu!==undefined?'CPU '+pc(fnum(c.cpu))+' · RAM '+String(c.mem||'').split('/')[0].trim():cstate(c)[1]}}
+  else if(s&&!m.unit){lab='Serwer';val='CPU '+pc(s.cpu)+' · RAM '+pc(s.mem)+' · dysk '+pc(s.disk)}
+  else if(s&&m.source==='journald'&&/\.service$/.test(m.unit)){lab='Usługa';val=ustate({host:m.host,source:'journald',unit:m.unit})[1]}
+  box.hidden=!val;$('#reslbl').textContent=lab;$('#resval').textContent=val;
   try{
-    const sel=cur.sel,h=await hits(sel,Date.now()-60*6e4,6e4);
+    const sel=cur.sel,h=await hits(sel+' '+EXCL,Date.now()-60*6e4,6e4);
     if(!cur||cur.sel!==sel)return;
     const v=(h[0]?h[0].v:new Array(61).fill(0)).slice(-60),r=sum(v.slice(-6,-1))/5;
     $('#rate').textContent=r>=10?Math.round(r):r.toFixed(1).replace('.',',');
@@ -603,7 +804,7 @@ async function reload(){
   log.textContent='';seen=new Set();fresh=0;jump.hidden=true;pos.hidden=true;$('#cnt').textContent='';marks();
   word=$('#q').value.trim();
   const lv=$('#lvl').value;
-  const q=cur.sel+(lv==='e'?' '+ERR:lv==='w'?' ('+ERR+' OR '+WARN+')':'')+(word?' ~'+quote('(?i)'+word.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')):'');
+  const q=cur.sel+' '+EXCL+(lv==='e'?' '+ERR:lv==='w'?' ('+ERR+' OR '+WARN+')':'')+(word?' ~'+quote('(?i)'+word.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')):'');
   try{
     status('Wczytuję…');
     const txt=await(await api('query',{query:q+' _time:'+$('#range').value,limit:LIMIT},signal)).text();
