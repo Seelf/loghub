@@ -28,7 +28,7 @@ SELF=/usr/local/sbin/loghub
 HUB_DIR=/opt/loghub
 PORT="${LOGHUB_PORT:-8080}"          # prywatny: agenci + strona w sieci lokalnej i Tailscale
 PUBLIC_PORT=8081                     # publiczny: tylko strona z logowaniem, tylko dla Tailscale Funnel
-RETENTION="${LOGHUB_RETENTION:-100d}"
+RETENTION="${LOGHUB_RETENTION:-730d}"
 STREAM_ARGS='_stream_fields=host,source,unit&_msg_field=message&_time_field=timestamp'
 
 say()  { printf '\033[1;32m==>\033[0m %s\n' "$*"; }
@@ -95,7 +95,7 @@ services:
     image: victoriametrics/victoria-logs:${VL_TAG:-latest}
     command:
       - -storageDataPath=/vlogs
-      - -retentionPeriod=${RETENTION:-100d}
+      - -retentionPeriod=${RETENTION:-730d}
     volumes:
       - ./data:/vlogs
     restart: unless-stopped
@@ -375,12 +375,12 @@ write_vector_config() {
     unset IFS
     echo "    exclude:"
     echo "      - /var/log/journal/**"
-    # TeamSpeak 3: osobne zrodlo, czytane od poczatku biezacych plikow (z ostatnich 7 dni), z czasem z linii logu
+    # TeamSpeak 3: osobne zrodlo, czytane od poczatku biezacych plikow (do 2 lat wstecz), z czasem z linii logu
     if [ -n "$TS3_DIRS" ]; then
       echo "  ts3:"
       echo "    type: file"
       echo "    read_from: beginning"
-      echo "    ignore_older_secs: 604800"
+      echo "    ignore_older_secs: 63072000"
       echo "    include:"
       while read -r d; do echo "      - \"$d/ts3server_*.log\""; done <<< "$TS3_DIRS"
     fi

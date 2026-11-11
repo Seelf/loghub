@@ -10,7 +10,7 @@ na świat można wystawić samą stronę z logowaniem.
 
 | Część | Gdzie | Z czego |
 |---|---|---|
-| Centrala | kontener LXC na Proxmoxie (albo dowolna maszyna z Dockerem) | VictoriaLogs (baza logów, 100 dni), Caddy (dwa wejścia), `auth.py` (logowanie + 2FA) |
+| Centrala | kontener LXC na Proxmoxie (albo dowolna maszyna z Dockerem) | VictoriaLogs (baza logów, 2 lata), Caddy (dwa wejścia), `auth.py` (logowanie + 2FA) |
 | Agent | każda obserwowana maszyna | Vector jako usługa systemd; czyta journald, `/var/log/**/*.log`, logi Dockera, wyniki crona |
 | Strona | serwowana przez centralę | jeden plik `hub/www/index.html`, bez bibliotek |
 
