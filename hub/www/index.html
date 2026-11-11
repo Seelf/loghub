@@ -568,9 +568,10 @@ function item(label,sel,meta,u){
 }
 // maszyna matka: host Proxmoxa, ktorego lista gosci (LXC/VM) zawiera nazwe innej maszyny z agentem
 function linkParents(){
-  const by=new Map();
-  for(const [host,s] of D.stat)for(const g of s.guests)if(g.name&&g.name!==host)by.set(g.name,{parent:host,g});
-  for(const h of D.hosts.values()){const x=by.get(h.name);h.parent=x&&D.hosts.has(x.parent)?x.parent:null;h.guest=x?x.g:null}
+  // przy kilku gosciach o tej samej nazwie wygrywa dzialajacy kontener LXC (tam instaluje sie agent)
+  const by=new Map(),score=g=>(g.status==='running'?2:0)+(g.type==='lxc'?1:0);
+  for(const [host,s] of D.stat)for(const g of s.guests)if(g.name&&g.name!==host){const o=by.get(g.name);if(!o||score(g)>score(o.g))by.set(g.name,{parent:host,g})}
+  for(const h of D.hosts.values()){const x=by.get(h.name);h.parent=x&&D.hosts.has(x.parent)?x.parent:null;h.guest=h.parent?x.g:null}
 }
 const kids=name=>[...D.hosts.values()].filter(h=>h.parent===name).sort((a,b)=>a.name.localeCompare(b.name));
 const family=name=>[name,...kids(name).flatMap(k=>family(k.name))];
@@ -598,14 +599,14 @@ function hostNode(h,open,first){
       d.append(item(short(u.unit),u.sel,{k:(u.host+' '+src+' '+u.unit).toLowerCase(),title:short(u.unit),host:u.host,source:src,unit:u.unit},u));
   }
   // goscie Proxmoxa: z agentem jako zagniezdzone maszyny, bez agenta jako sam stan
-  const ks=kids(h.name),withAgent=new Set(ks.map(k=>k.name)),bare=s?s.guests.filter(g=>!withAgent.has(g.name)):[];
+  const ks=kids(h.name),withAgent=new Set(ks.map(k=>k.guest&&k.guest.id)),bare=s?s.guests.filter(g=>!withAgent.has(g.id)):[];
   if(ks.length||bare.length){
     d.append(el('div','grp','LXC i VM'));
     for(const k of ks)d.append(hostNode(k,open,first));
     for(const g of bare.sort((a,b)=>String(a.name).localeCompare(String(b.name)))){
       const on=g.status==='running',it=el('div','it ghost');it.dataset.k=(h.name+' '+g.name).toLowerCase();
       const dt=el('i','dot'+(on?' up':''));dt.title=g.status||'';
-      it.append(dt,el('span','',(g.name||g.id)+' · '+(g.type==='qemu'?'VM':'LXC')),el('small','',on?pc((g.cpu||0)*100):'stop'));
+      it.append(dt,el('span','',(g.name||g.id)+' · '+(g.type==='qemu'?'VM ':'LXC ')+(g.vmid||'')),el('small','',on?pc((g.cpu||0)*100):'stop'));
       it.title='bez agenta loghub: widać tylko stan i zużycie z Proxmoxa';d.append(it);
     }
   }

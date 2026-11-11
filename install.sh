@@ -594,6 +594,7 @@ while :; do
     # tylko uslugi aktywne, uruchamiane albo padniete; brak na liscie = nieaktywna bez bledu
     un=$(systemctl list-units --type=service --all --no-legend --plain --no-pager 2>/dev/null | awk '
       { i = ($1 ~ /\./) ? 1 : 2; u = $i; l = $(i+1); a = $(i+2); s = $(i+3)
+        gsub(/\\/, "\\\\", u)   # nazwy jak systemd-fsck@dev-disk-by\x2duuid: ukosnik musi byc podwojony w JSON
         if (l == "loaded" && a != "inactive") printf "%s[\"%s\",\"%s\",\"%s\"]", (n++ ? "," : ""), u, a, s }')
     extra="$extra,\"units\":[${un}]"
   fi
