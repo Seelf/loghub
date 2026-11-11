@@ -10,6 +10,7 @@ API (za forward_auth w Caddy; naglowek X-Role ustawia usluga logowania):
   PUT  /api/notify/config   zapis ustawien (tylko admin)
   POST /api/notify/test     wiadomosc testowa na wszystkie wlaczone kanaly (tylko admin)
 """
+import calendar
 import copy
 import json
 import os
@@ -41,7 +42,7 @@ DEFAULT = {
         "cron_failed": {"on": True},
         "disk": {"on": True, "pct": 90},
         "disk_health": {"on": True},
-        "ports": {"on": True},
+        "ports": {"on": True},  # nowy port otwarty na swiat w ufw
         "cpu": {"on": True, "pct": 90, "minutes": 10},
         "mem": {"on": True, "pct": 90, "minutes": 10},
         "errors": {"on": False, "count": 50, "minutes": 5},
@@ -59,7 +60,7 @@ CHANNEL_FIELDS = {
 }
 
 LOCK = threading.Lock()
-ST = {"active": {}, "history": [], "checked_at": 0, "error": "", "seen_cron": [], "ports": {}}
+ST = {"active": {}, "history": [], "checked_at": 0, "error": "", "seen_cron": [], "ufw": {}}
 
 # ------------------------------------------------------------------ pliki
 
@@ -215,26 +216,29 @@ def evaluate(cfg):
                      "%s: %d błędów w %s w ciągu %d min" % (o.get("host"), c, o.get("unit"), m), "Próg: %s." % R["errors"]["count"], "warn")
 
     if R["ports"]["on"]:
-        # zmiany nasluchujacych portow TCP poza adresami lokalnymi (127.x, ::1)
+        # jedno powiadomienie, gdy ufw zacznie wpuszczac nowy port z calego swiata (albo gdy ufw zostanie wylaczony)
         with LOCK:
-            prev = ST.setdefault("ports", {})
+            prev = ST.setdefault("ufw", {})
             for h, o in latest.items():
-                if "ports" not in o:
+                if "ufw_state" not in o:
                     continue
-                cur = {}
-                for x in jlist(o.get("ports")):
-                    if isinstance(x, list) and len(x) >= 4 and x[0] == "tcp" and not str(x[1]).startswith(("127.", "::1")):
-                        cur["%s:%s" % (x[1], x[2])] = x[3]
+                cur = {"state": o.get("ufw_state"), "rules": sorted(str(x) for x in jlist(o.get("ufw"))), "t": o.get("_time", "")}
                 old = prev.get(h)
                 prev[h] = cur
-                if old is None:
+                if not old:
                     continue
-                for k in sorted(set(cur) - set(old)):
-                    events.append({"key": "port+:%s:%s:%d" % (h, k, int(now)), "kind": "ports", "host": h, "unit": "",
-                                   "title": "%s: nowy otwarty port %s" % (h, k), "detail": "proces: %s" % (cur[k] or "nieznany"), "sev": "warn"})
-                for k in sorted(set(old) - set(cur)):
-                    events.append({"key": "port-:%s:%s:%d" % (h, k, int(now)), "kind": "ports", "host": h, "unit": "",
-                                   "title": "%s: port %s przestał nasłuchiwać" % (h, k), "detail": "proces: %s" % (old[k] or "nieznany"), "sev": "warn"})
+                win = "Zmiana nastąpiła między %s a %s." % (local_time(old.get("t")), local_time(cur["t"]))
+                if old.get("state") == "active" and cur["state"] != "active":
+                    events.append({"key": "ufw-off:%s:%s" % (h, cur["t"]), "kind": "ports", "host": h, "unit": "",
+                                   "title": "%s: zapora ufw została wyłączona - wszystkie porty są otwarte na świat" % h, "detail": win, "sev": "error"})
+                    continue
+                if cur["state"] != "active":
+                    continue
+                added = [r for r in cur["rules"] if r not in old.get("rules", [])]
+                if added:
+                    events.append({"key": "ufw+:%s:%s" % (h, cur["t"]), "kind": "ports", "host": h, "unit": "",
+                                   "title": "%s: ufw otworzył na świat %s %s" % (h, "port" if len(added) == 1 else "porty", ", ".join(added)),
+                                   "detail": win, "sev": "warn"})
 
     if R["cron_failed"]["on"]:
         for o in query('{source="cron"} NOT cron_state:=ok _time:%ds' % (EVERY * 3), 200):
@@ -243,6 +247,14 @@ def evaluate(cfg):
                            "title": "%s: zadanie cron zakończone błędem (kod %s)" % (o.get("host"), o.get("exit_code", "?")),
                            "detail": o.get("cron_cmd") or o.get("unit", ""), "sev": "error", "at": o.get("_time", "")})
     return firing, events
+
+
+def local_time(iso):
+    """Czas z rekordu (UTC) jako lokalna godzina, np. 10:42."""
+    try:
+        return time.strftime("%d.%m %H:%M", time.localtime(calendar.timegm(time.strptime(str(iso)[:19], "%Y-%m-%dT%H:%M:%S"))))
+    except (ValueError, TypeError):
+        return "?"
 
 
 def check_once():
@@ -446,9 +458,11 @@ class Handler(BaseHTTPRequestHandler):
     def do_GET(self):
         p = self.path.split("?")[0]
         if p == "/api/notify/state":
+            hs = self.headers.get("X-Hosts", "*")
+            ok = (lambda a: True) if hs == "*" else (lambda a, allow=set(hs.split(",")): a.get("host") in allow)
             with LOCK:
-                act = sorted(ST["active"].values(), key=lambda a: (a.get("sev") != "error", -a.get("since", 0)))
-                return self.send(200, {"active": act, "history": ST["history"][:100], "checked_at": ST["checked_at"], "error": ST["error"],
+                act = sorted([a for a in ST["active"].values() if ok(a)], key=lambda a: (a.get("sev") != "error", -a.get("since", 0)))
+                return self.send(200, {"active": act, "history": [a for a in ST["history"] if ok(a)][:100], "checked_at": ST["checked_at"], "error": ST["error"],
                                        "channels": sum(1 for c in config()["channels"] if c.get("on", True))})
         if p == "/api/notify/config":
             if not self.admin():

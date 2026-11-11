@@ -53,7 +53,8 @@ curl -fsSL https://raw.githubusercontent.com/Seelf/loghub/main/install.sh | sudo
   --hub http://ADRES_TAILSCALE_CENTRALI:8080 --token TOKEN
 ```
 
-Agent sam instaluje Tailscale i Vectora. Na maszynie nie trzeba otwierać żadnego portu.
+Agent sam instaluje Tailscale i Vectora (gdy Tailscale już działa, dodaj `--no-tailscale`). Na maszynie nie trzeba
+otwierać żadnego portu. Logi TeamSpeak 3 (`ts3server_*.log`) w /opt, /srv, /home, /root są wykrywane same.
 Opcje: `--name NAZWA`, `--logs "/opt/ts3/logs/*.log,/srv/app/*.log"`, `--no-cron`, `--no-status`, `--no-lxc`, `--no-tailscale`.
 
 Aktualizacja: uruchom tę samą komendę jeszcze raz; nadpisze konfigurację agenta.
@@ -78,7 +79,8 @@ Funnel wymaga włączonego HTTPS i Funnel w panelu Tailscale; polecenie poda lin
 ## Polecenia na centrali
 
 ```bash
-loghub user add NAZWA [--role admin|viewer]   # hasło generuje się samo, 2FA przy pierwszym logowaniu
+loghub user add NAZWA [--role admin|viewer] [--hosts pve,vps]   # hasło generuje się samo, 2FA przy pierwszym logowaniu
+loghub user hosts NAZWA pve,vps|all                         # które maszyny widzi oglądający
 loghub user list | del NAZWA | passwd NAZWA | reset-2fa NAZWA
 loghub public on | off | status
 ```
@@ -99,19 +101,27 @@ Usługa `loghub-status` co minutę wysyła CPU, RAM, dysk i obciążenie maszyny
 (z `docker stats`), stan usług systemd, a na hoście Proxmox także listę kontenerów LXC i VM z ich zużyciem.
 Na stronie: kolorowe kropki (działa / zatrzymane / padło), wskaźniki na kartach serwerów i zakładka Zasoby.
 
+## Konta i dostęp
+
+Konta zakłada się w przeglądarce (Użytkownicy, tylko administrator) albo poleceniem `loghub user`. Każde konto
+loguje się hasłem i kodem 2FA. Oglądający widzi tylko zaznaczone maszyny: usługa logowania pośredniczy w każdym
+zapytaniu do bazy i dokleja filtr maszyn (`extra_stream_filters`), którego nie da się obejść treścią zapytania.
+Zmiana dostępu działa od razu.
+
 ## Stan, zasoby i drzewo maszyn
 
 Usługa `loghub-status` co ok. 20 s wysyła CPU, RAM, dysk, obciążenie, stan kontenerów Dockera i usług systemd,
 a na hoście Proxmox także listę LXC i VM z ich zużyciem. Do tego wszystkie zamontowane dyski i udziały,
 pule ZFS, stan SMART fizycznych dysków (co 10 min, na maszynach fizycznych; agent doinstalowuje smartmontools)
-oraz nasłuchujące porty TCP/UDP z nazwą procesu. Strona odświeża zasoby co 15 s.
+oraz nasłuchujące porty TCP/UDP z nazwą procesu i reguły zapory ufw otwarte na świat. Strona odświeża zasoby co 15 s.
 Maszyny będące kontenerami LXC/VM Proxmoxa pokazują się w drzewie pod swoim hostem (dopasowanie po nazwie).
 
 ## Powiadomienia
 
 Usługa `notify` na centrali co minutę sprawdza: brak kontaktu z maszyną, padnięte kontenery i usługi, błędy
 zadań cron, zapełnienie każdego dysku, awarię dysku (SMART) i pule ZFS poza stanem ONLINE, wysokie CPU i RAM,
-nowe lub zamknięte porty TCP, nagły wysyp błędów w logach. Kanały: ntfy, Telegram, Discord,
+port nowo otwarty na świat w zaporze ufw (jedno powiadomienie z oknem czasowym zmiany) albo wyłączenie ufw,
+nagły wysyp błędów w logach. Kanały: ntfy, Telegram, Discord,
 webhook, e-mail. Ustawienia: zakładka Powiadomienia (tylko administrator).
 
 ## Zadania cron

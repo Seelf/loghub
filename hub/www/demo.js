@@ -233,6 +233,8 @@
       media: [['tcp', '0.0.0.0', 22, 'sshd'], ['tcp', '*', 8096, 'docker-proxy'], ['tcp', '*', 8989, 'docker-proxy'], ['tcp', '*', 7878, 'docker-proxy'], ['tcp', '*', 9696, 'docker-proxy'], ['tcp', '*', 8080, 'docker-proxy'], ['tcp', '192.168.0.120', 6767, 'docker-proxy']],
       loghub: [['tcp', '0.0.0.0', 8080, 'docker-proxy'], ['tcp', '127.0.0.1', 8081, 'docker-proxy'], ['tcp', '0.0.0.0', 22, 'sshd']] };
     o.ports = JSON.stringify(PORTS[host] || []);
+    if (host === 'vps') { o.ufw_state = 'active'; o.ufw = JSON.stringify(['22/tcp', '10011', '30033/tcp', '9987/udp']); }
+    if (host === 'media') { o.ufw_state = 'inactive'; o.ufw = '[]'; }
     const units = U.filter(u => u[0] === host && u[1] === 'journald' && /\.service$/.test(u[2])).map(u => [u[2], 'active', 'running']);
     for (const f of FAILED[host] || []) units.push([f, 'failed', 'failed']);
     o.units = JSON.stringify(units);
@@ -246,7 +248,8 @@
     HOSTS.forEach((x, hi) => { for (let k = 0; k < 48; k++) { const t = end - k * step, o = statRec(hi, t); out.push({ host: x[0], _time: new Date(t).toISOString(), cpu: o.cpu, mem: o.mem_pct }); } });
     return out;
   }
-  let user = { user: 'admin', role: 'admin' };
+  let user = { user: 'admin', role: 'admin', hosts: null };
+  const ACCOUNTS = { admin: { user: 'admin', role: 'admin', hosts: null, totp: true }, ola: { user: 'ola', role: 'viewer', hosts: ['media', 'pve'], totp: true }, kamil: { user: 'kamil', role: 'viewer', hosts: ['vps'], totp: false } };
   let NCFG = { rules: { host_offline: { on: true, minutes: 3 }, service_down: { on: true }, cron_failed: { on: true }, disk: { on: true, pct: 90 },
     cpu: { on: true, pct: 90, minutes: 10 }, mem: { on: true, pct: 90, minutes: 10 }, errors: { on: false, count: 50, minutes: 5 }, disk_health: { on: true }, ports: { on: true } },
     notify_resolved: true, repeat_hours: 0, channels: [{ id: 'demo1', type: 'ntfy', on: true, name: 'telefon', url: 'https://ntfy.sh/moj-loghub', token: '' }] };
@@ -287,6 +290,22 @@
       }
       return new Response('nieznana sciezka', { status: 404 });
     },
+    // konta na niby
+    async users(path, method, body) {
+      if (!path && (!method || method === 'GET')) return { users: Object.values(ACCOUNTS) };
+      if (!path && method === 'POST') {
+        if (!/^[a-z0-9_-]{2,32}$/.test(body.user || '')) throw new Error('nazwa: 2-32 znaki z zestawu a-z 0-9 _ -');
+        if (ACCOUNTS[body.user]) throw new Error('taki użytkownik już istnieje');
+        ACCOUNTS[body.user] = { user: body.user, role: body.role, hosts: body.role === 'admin' || body.hosts === 'all' ? null : body.hosts, totp: false };
+        return Object.assign({ password: 'a1b2c3-d4e5f6-0789ab' }, ACCOUNTS[body.user]);
+      }
+      const u = ACCOUNTS[path]; if (!u) throw new Error('nie ma takiego użytkownika');
+      if (method === 'DELETE') { if (path === user.user) throw new Error('nie można usunąć własnego konta'); delete ACCOUNTS[path]; return { ok: true }; }
+      if ('role' in body) u.role = body.role;
+      if ('hosts' in body) u.hosts = u.role === 'admin' || body.hosts === 'all' ? null : body.hosts;
+      if (body.reset_2fa) u.totp = false;
+      return Object.assign({}, u, body.new_password ? { password: 'f0e1d2-c3b4a5-968778' } : {});
+    },
     // powiadomienia na niby: przykladowe alerty, ustawienia trzymane w pamieci strony
     async notify(path, method, body) {
       const now = Math.floor(Date.now() / 1000), m = 60;
@@ -301,7 +320,7 @@
           { key: 'ct:media:seerr', kind: 'service_down', host: 'media', unit: 'seerr', title: 'media: kontener seerr nie przechodzi kontroli zdrowia', detail: 'nie przechodzi kontroli zdrowia', sev: 'error', since: now - 300 * m }],
         history: [
           { kind: 'cron_failed', host: 'vps', unit: 'certbot renew --quiet', title: 'vps: zadanie cron zakończone błędem (kod 1)', detail: 'certbot renew --quiet', sev: 'error', since: now - 540 * m, until: now - 540 * m },
-          { kind: 'ports', host: 'vps', unit: '', title: 'vps: nowy otwarty port 0.0.0.0:30033', detail: 'proces: ts3server', sev: 'warn', since: now - 120 * m, until: now - 120 * m },
+          { kind: 'ports', host: 'vps', unit: '', title: 'vps: ufw otworzył na świat port 30033/tcp', detail: 'Zmiana nastąpiła między 11.11 08:42 a 11.11 08:43.', sev: 'warn', since: now - 120 * m, until: now - 120 * m },
           { kind: 'cpu', host: 'media', unit: '', title: 'media: CPU 94% (średnio 10 min)', detail: 'Próg: 90%.', sev: 'warn', since: now - 260 * m, until: now - 228 * m },
           { kind: 'service_down', host: 'pve', unit: 'pveproxy.service', title: 'pve: usługa pveproxy.service padła', detail: 'systemd: failed', sev: 'error', since: now - 1500 * m, until: now - 1496 * m }],
       };
@@ -317,7 +336,7 @@
       const name = String(body.user || '').trim().toLowerCase() || 'demo';
       if (name === 'nowy' && !String(body.code || '').trim())
         return { status: 200, data: { enroll: { secret: 'JBSWY3DPEHPK3PXPJBSWY3DPEHPK3PXP', uri: 'otpauth://totp/loghub:nowy?secret=JBSWY3DPEHPK3PXPJBSWY3DPEHPK3PXP&issuer=loghub' } } };
-      user = { user: name, role: name === 'admin' || name === 'demo' ? 'admin' : 'viewer' };
+      user = { user: name, role: name === 'admin' || name === 'demo' ? 'admin' : 'viewer', hosts: name === 'admin' || name === 'demo' ? null : ['vps'] };
       return { status: 200, data: user };
     },
   };

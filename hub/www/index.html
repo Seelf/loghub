@@ -145,6 +145,17 @@ main{flex:1;min-width:0;display:flex;flex-direction:column}
 .acts{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
 .acts .pri{background:var(--acc);border-color:var(--acc);color:var(--bg);font-weight:600}
 #nmsg{font-size:12px}
+#usersv{flex:1;overflow:auto;padding:18px 22px 28px;display:flex;flex-direction:column;gap:14px}
+#usersv>*{flex:none}
+#usersv>header{display:flex;align-items:flex-start;gap:10px}
+#utbl{border:1px solid var(--line);border-radius:12px;background:var(--card);overflow-x:auto}
+#utbl .tr{grid-template-columns:minmax(120px,1fr) 110px minmax(200px,2fr) 90px minmax(280px,auto);min-width:860px;cursor:default}
+.hp{display:flex;flex-direction:column;gap:3px;max-height:260px;overflow:auto;border:1px solid var(--line);border-radius:8px;padding:8px}
+.hp label{display:flex;gap:7px;align-items:center;font-size:13px}
+.hp .kid{padding-left:20px}
+.pwbox{border:1px solid var(--acc);border-radius:8px;padding:10px;font-family:var(--mono)}
+.ufrm{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px;align-items:start}
+.ufrm label{display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--mut)}
 .meters{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
 .mt{display:flex;flex-direction:column;gap:3px;min-width:0}
 .mt .row b{font-size:15px;font-variant-numeric:tabular-nums;margin-left:auto}
@@ -159,7 +170,7 @@ main{flex:1;min-width:0;display:flex;flex-direction:column}
 .dl .num{text-align:right;color:var(--mut);white-space:nowrap;font-size:11px}
 #dtbl,#ptbl{border:1px solid var(--line);border-radius:12px;background:var(--card);overflow-x:auto;margin-top:10px}
 #dtbl .tr{grid-template-columns:minmax(120px,1fr) minmax(160px,1.6fr) 90px minmax(170px,1.6fr) minmax(150px,1.3fr);min-width:800px;cursor:default}
-#ptbl .tr{grid-template-columns:minmax(120px,1fr) 60px minmax(140px,1.3fr) 80px minmax(130px,1.2fr) minmax(170px,1.4fr);min-width:780px;cursor:default}
+#ptbl .tr{grid-template-columns:minmax(120px,1fr) 60px minmax(130px,1.2fr) 70px minmax(120px,1.1fr) minmax(160px,1.3fr) minmax(130px,1fr);min-width:900px;cursor:default}
 .guests{display:flex;flex-direction:column;gap:3px;border-top:1px solid var(--line);padding-top:8px}
 .guests>div{display:grid;grid-template-columns:12px 1fr 52px 96px;gap:8px;align-items:center;font-size:12px}
 .guests span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -248,6 +259,7 @@ mark{background:var(--hl);color:inherit;border-radius:2px}
     <button data-go="err">Błędy i ostrzeżenia<small class="chip bad" id="nerr" hidden></small></button>
     <button data-go="cron">Zadania cron<small class="chip bad" id="ncron" hidden></small></button>
     <button data-go="notif">Powiadomienia<small class="chip bad" id="nnot" hidden></small></button>
+    <button data-go="users" id="navusers" hidden>Użytkownicy</button>
   </div>
   <div class="lbl">Serwery</div>
   <input id="f" placeholder="filtruj źródła (Ctrl K)" aria-label="Filtruj źródła">
@@ -332,6 +344,21 @@ mark{background:var(--hl);color:inherit;border-radius:2px}
     <div id="nhist" class="nlist"></div>
   </section>
 
+  <section id="usersv" hidden>
+    <header><button class="tog" data-tog title="Pokaż lub ukryj panel">☰</button><div><h1>Użytkownicy</h1><div class="mut">Każde konto loguje się hasłem i kodem 2FA (włączanym przy pierwszym logowaniu). Oglądający widzi tylko maszyny, które mu zaznaczysz.</div></div></header>
+    <div class="panel">
+      <h2 id="ufh">Nowe konto</h2>
+      <div class="ufrm">
+        <label>Nazwa użytkownika<input id="un" autocomplete="off" placeholder="np. kamil"></label>
+        <label>Rola<select id="ur"><option value="viewer">oglądający</option><option value="admin">administrator (widzi wszystko, zarządza)</option></select></label>
+      </div>
+      <div id="uhw"><div class="lbl" style="margin-bottom:6px">Maszyny, które widzi</div><div class="hp" id="uhp"></div></div>
+      <div class="acts"><button class="pri" id="usave">Dodaj konto</button><button id="ucancel" hidden>Anuluj edycję</button><span id="umsg" role="status"></span></div>
+      <div id="upw" class="pwbox" hidden></div>
+    </div>
+    <div id="utbl"></div>
+  </section>
+
   <section id="logs" hidden>
     <div id="head">
       <button class="tog" data-tog title="Pokaż lub ukryj panel">☰</button>
@@ -410,7 +437,8 @@ function showLogin(msg){
 }
 function enter(u){
   me=u;$('#login').hidden=true;$('#app').hidden=false;
-  $('#who').textContent=u.user;$('#role').textContent=u.role==='admin'?'administrator':'oglądający';
+  $('#who').textContent=u.user;$('#role').textContent=u.role==='admin'?'administrator':(u.hosts?'oglądający: '+(u.hosts.length?u.hosts.length+' masz.':'brak'):'oglądający');
+  $('#navusers').hidden=u.role!=='admin';$('#adv').hidden=!!u.hosts||!!demo();if(view==='users'&&u.role!=='admin')view='over';
   if(demo()){$('#demo').hidden=false;$('#adv').hidden=true}
   if(!started){started=true;setInterval(refresh,6e4);setInterval(()=>{if(me&&view==='logs')headStats()},3e4);setInterval(pollStat,15e3);setInterval(loadNotif,3e4)}
   show(view);refresh();loadNotif();
@@ -496,7 +524,8 @@ function readStat(rows){
       memT:+o.mem_total_kb||0,memA:+o.mem_avail_kb||0,diskU:+o.disk_used_kb||0,diskT:+o.disk_total_kb||0,
       cmap:new Map(pj(o.containers).map(c=>[c.n,Object.assign({},c,cs.get(c.n)||{})])),
       umap:new Map(pj(o.units).map(x=>[x[0],x])),guests:pj(o.guests),
-      disks:pj(o.disks).filter(d=>Array.isArray(d)&&d[4]>0),pools:pj(o.pools),smart:pj(o.smart),ports:o.ports==null?null:pj(o.ports)});
+      disks:pj(o.disks).filter(d=>Array.isArray(d)&&d[4]>0),pools:pj(o.pools),smart:pj(o.smart),ports:o.ports==null?null:pj(o.ports),
+      ufwState:o.ufw_state||null,ufw:pj(o.ufw)});
   }
   return m;
 }
@@ -651,7 +680,7 @@ function marks(){
   const k=view==='cron'&&cronHost?'':view!=='logs'?view:cur&&cur.sel===ALL?($('#lvl').value?'err':'all'):'';
   for(const b of document.querySelectorAll('#nav button'))b.classList.toggle('on',b.dataset.go===k);
 }
-function show(v){view=v;$('#over').hidden=v!=='over';$('#logs').hidden=v!=='logs';$('#cronv').hidden=v!=='cron';$('#notv').hidden=v!=='notif';marks();if(v==='notif')loadNotif(true)}
+function show(v){view=v;$('#over').hidden=v!=='over';$('#logs').hidden=v!=='logs';$('#cronv').hidden=v!=='cron';$('#notv').hidden=v!=='notif';$('#usersv').hidden=v!=='users';marks();if(v==='notif')loadNotif(true);if(v==='users')loadUsers()}
 
 // -------------------------------------------------------------------- przeglad
 function renderOver(light){
@@ -683,7 +712,7 @@ function renderOver(light){
         if(chips.children.length)dl.append(chips);
         res.push(dl);
       }
-      if(s.ports){const pub=s.ports.filter(x=>pscope(x[1])==='all'&&x[0]==='tcp').length,b=el('button','chip',s.ports.length+' portów nasłuchuje'+(pub?', '+pub+' TCP na wszystkich interfejsach':''));
+      if(s.ports){const pub=s.ports.filter(x=>pscope(x[1])==='all'&&x[0]==='tcp').length,b=el('button','chip'+(s.ufwState==='inactive'?' wrn':''),s.ports.length+' portów nasłuchuje'+(pub?', '+pub+' TCP na wszystkich interfejsach':'')+(s.ufwState==='active'?' · ufw: '+s.ufw.length+' otwartych na świat':s.ufwState==='inactive'?' · ufw wyłączony':''));
         b.style.alignSelf='flex-start';b.onclick=()=>{$('#ps').value=h.name;document.querySelector('#tabs button[data-tab=ports]').click()};res.push(b)}
       const hi=D.hist.get(h.name);
       if(hi){const r2=el('div','row');r2.append(el('span','lbl','CPU 24 h'),el('span','num mut','śr. '+pc(sum(hi.cpu.filter(x=>x!=null))/Math.max(1,hi.cpu.filter(x=>x!=null).length))));const sp2=el('div','sp');sparkPct(sp2,hi.cpu,30*6e4);res.push(r2,sp2)}
@@ -797,15 +826,19 @@ function renderDisks(){
 }
 function renderPorts(){
   const t=$('#ps').value.trim().toLowerCase(),sc=$('#pscope').value,pr=$('#pproto').value,tbl=$('#ptbl');tbl.textContent='';
-  const hd=el('div','tr h');for(const x of ['Maszyna','Prot.','Adres','Port','Proces','Dostępny z'])hd.append(el('span','',x));tbl.append(hd);
+  const hd=el('div','tr h');for(const x of ['Maszyna','Prot.','Adres','Port','Proces','Nasłuchuje na','Zapora ufw'])hd.append(el('span','',x));tbl.append(hd);
   const rows=[];
-  for(const [host,s] of D.stat)for(const x of s.ports||[])rows.push({host,proto:x[0],addr:x[1],port:x[2],proc:x[3]||'',sc:pscope(x[1])});
+  // czy regula ufw (np. "22/tcp", "10011", "6000:6010/tcp") wpuszcza dany port z calego swiata
+  const ufwOpen=(s,proto,port)=>s.ufw.some(r=>{const m=String(r).match(/^(\d+)(?::(\d+))?(?:\/(tcp|udp))?$/);return m&&(!m[3]||m[3]===proto)&&port>=+m[1]&&port<=+(m[2]||m[1])});
+  for(const [host,s] of D.stat)for(const x of s.ports||[])rows.push({host,proto:x[0],addr:x[1],port:x[2],proc:x[3]||'',sc:pscope(x[1]),
+    fw:!s.ufwState?'':s.ufwState==='inactive'?'off':pscope(x[1])==='local'?'':ufwOpen(s,x[0],x[2])?'open':'closed'});
   const rs=rows.filter(r=>(!sc||r.sc===sc)&&(!pr||r.proto===pr)&&(!t||(r.host+' '+r.port+' '+r.proc+' '+r.addr).toLowerCase().includes(t)))
     .sort((a,b)=>a.host.localeCompare(b.host)||a.port-b.port||a.proto.localeCompare(b.proto));
   for(const r of rs){
     const row=el('div','tr'),sp=el('span');sp.append(el('span','chip '+(r.sc==='all'?'wrn':r.sc==='local'?'':'ok'),PSC[r.sc]));
     const pt=el('span','num',r.port);pt.style.fontFamily='var(--mono)';
-    row.append(el('span','',r.host),el('span','mut',r.proto.toUpperCase()),el('span','mut',r.addr),pt,el('span','',r.proc||'–'),sp);tbl.append(row);
+    const fw=el('span');if(r.fw)fw.append(el('span','chip '+(r.fw==='open'?'wrn':r.fw==='off'?'bad':'ok'),r.fw==='open'?'otwarty na świat':r.fw==='off'?'ufw wyłączony':'zablokowany'));else fw.append(el('span','mut','–'));
+    row.append(el('span','',r.host),el('span','mut',r.proto.toUpperCase()),el('span','mut',r.addr),pt,el('span','',r.proc||'–'),sp,fw);tbl.append(row);
   }
   if(!rs.length)tbl.append(el('div','n',rows.length?'Nic nie pasuje do filtra.':'Brak danych o portach. Zaktualizuj agentów (ta sama komenda instalacji).'));
 }
@@ -842,6 +875,70 @@ function renderRes(){
 }
 $('#rs').oninput=$('#rsort').onchange=$('#rtype').onchange=renderRes;
 
+// ------------------------------------------------------------------ uzytkownicy
+async function uapi(path,method,body){
+  if(demo())return demo().users(path,method,body);
+  const r=await fetch('/auth/users'+(path?'/'+encodeURIComponent(path):''),{method:method||'GET',headers:body?{'Content-Type':'application/json'}:{},body:body?JSON.stringify(body):undefined});
+  if(r.status===401){showLogin('Sesja wygasła. Zaloguj się ponownie.');throw new Error('sesja wygasła')}
+  const d=await r.json().catch(()=>({}));
+  if(!r.ok)throw new Error(d.error||('błąd '+r.status));
+  return d;
+}
+let UEDIT=null;
+// lista maszyn do zaznaczenia: maszyny matki, pod nimi ich kontenery; zaznaczenie matki zaznacza tez kontenery
+function hostPicker(sel){
+  const box=$('#uhp');box.textContent='';
+  const all=el('label'),ac=el('input');ac.type='checkbox';ac.id='uall';ac.checked=sel==null;all.append(ac,'wszystkie maszyny (także te dodane później)');box.append(all);
+  const names=[...D.hosts.keys()];for(const x of sel||[])if(!D.hosts.has(x))names.push(x);
+  const roots=names.filter(n=>{const hh=D.hosts.get(n);return !hh||!hh.parent}).sort();
+  const add=(n,kid)=>{const l=el('label',kid?'kid':''),c=el('input');c.type='checkbox';c.value=n;c.className='uh';c.checked=sel==null||sel.includes(n);c.disabled=sel==null;
+    c.onchange=()=>{if(!kid)for(const k of family(n).slice(1)){const x=box.querySelector('.uh[value="'+CSS.escape(k)+'"]');if(x)x.checked=c.checked}};
+    l.append(c,n+(D.hosts.has(n)?'':' (brak danych)'));box.append(l)};
+  for(const r of roots){add(r,false);for(const k of family(r).slice(1))add(k,true)}
+  ac.onchange=()=>{for(const c of box.querySelectorAll('.uh')){c.disabled=ac.checked;if(ac.checked)c.checked=true}};
+}
+function pickedHosts(){return $('#uall').checked?'all':[...document.querySelectorAll('#uhp .uh:checked')].map(c=>c.value)}
+function uform(u){
+  UEDIT=u?u.user:null;$('#ufh').textContent=u?'Edycja konta: '+u.user:'Nowe konto';
+  $('#un').value=u?u.user:'';$('#un').disabled=!!u;$('#ur').value=u?u.role:'viewer';
+  $('#usave').textContent=u?'Zapisz zmiany':'Dodaj konto';$('#ucancel').hidden=!u;$('#umsg').textContent='';
+  hostPicker(u?u.hosts:[]);$('#uhw').hidden=$('#ur').value==='admin';
+}
+$('#ur').onchange=()=>{$('#uhw').hidden=$('#ur').value==='admin'};
+$('#ucancel').onclick=()=>uform(null);
+function showPw(user,pw){const b=$('#upw');b.hidden=false;b.textContent='';b.append(el('div','','Login: '+user),el('div','','Hasło: '+pw),el('div','mut','Przekaż je bezpiecznie; nie pokażę go ponownie. Przy pierwszym logowaniu użytkownik włączy 2FA.'))}
+$('#usave').onclick=async()=>{
+  const m=$('#umsg');m.style.color='';m.textContent='Zapisuję…';
+  const role=$('#ur').value,hosts=role==='admin'?'all':pickedHosts();
+  try{
+    if(UEDIT){await uapi(UEDIT,'PUT',{role,hosts});m.style.color='var(--acc)';m.textContent='Zapisano. Zmiana działa od razu.';uform(null)}
+    else{const r=await uapi('','POST',{user:$('#un').value.trim(),role,hosts});showPw(r.user,r.password);m.textContent='';uform(null)}
+    loadUsers();
+  }catch(e){m.style.color='var(--err)';m.textContent='Nie zapisano: '+e.message}
+};
+async function loadUsers(){
+  if(!me||me.role!=='admin')return;
+  const tbl=$('#utbl');
+  try{
+    const {users}=await uapi('');
+    if(UEDIT==null&&!$('#uhp').children.length)uform(null);
+    tbl.textContent='';
+    const hd=el('div','tr h');for(const x of ['Konto','Rola','Widzi maszyny','2FA','Akcje'])hd.append(el('span','',x));tbl.append(hd);
+    for(const u of users){
+      const r=el('div','tr'),hs=el('span');
+      if(u.role==='admin'||u.hosts==null)hs.append(el('span','chip ok','wszystkie'));else if(!u.hosts.length)hs.append(el('span','chip bad','żadna'));else for(const x of u.hosts)hs.append(el('span','chip',x)),hs.append(' ');
+      const acts=el('span','acts'),be=el('button','','Edytuj'),bp=el('button','','Nowe hasło'),b2=el('button','','Reset 2FA'),bd=el('button','','Usuń');
+      be.onclick=()=>{uform(u);$('#usersv').scrollTop=0};
+      bp.onclick=async()=>{try{const x=await uapi(u.user,'PUT',{new_password:true});showPw(u.user,x.password);$('#usersv').scrollTop=0}catch(e){$('#umsg').textContent=e.message}};
+      b2.onclick=async()=>{if(b2.dataset.ok!=='1'){b2.dataset.ok='1';b2.textContent='Na pewno?';return}try{await uapi(u.user,'PUT',{reset_2fa:true});loadUsers()}catch(e){$('#umsg').textContent=e.message}};
+      bd.onclick=async()=>{if(bd.dataset.ok!=='1'){bd.dataset.ok='1';bd.textContent='Na pewno usunąć?';bd.style.color='var(--err)';return}try{await uapi(u.user,'DELETE');loadUsers()}catch(e){$('#umsg').style.color='var(--err)';$('#umsg').textContent=e.message}};
+      if(u.user===me.user)bd.disabled=true;
+      acts.append(be,bp,b2,bd);
+      r.append(el('span','',u.user+(u.user===me.user?' (Ty)':'')),el('span','mut',u.role==='admin'?'administrator':'oglądający'),hs,el('span',u.totp?'':'mut',u.totp?'włączone':'przy 1. logowaniu'),acts);tbl.append(r);
+    }
+  }catch(e){tbl.textContent='';tbl.append(el('div','n','Nie udało się wczytać kont: '+e.message))}
+}
+
 // ------------------------------------------------------------------ powiadomienia
 async function napi(path,method,body){
   if(demo())return demo().notify(path,method,body);
@@ -852,7 +949,7 @@ async function napi(path,method,body){
   return d;
 }
 const RULES=[['host_offline','Serwer bez kontaktu z centralą',[['minutes','po',' min']]],['service_down','Padnięty kontener Dockera lub usługa systemd',[]],['cron_failed','Zadanie cron zakończone błędem',[]],
-  ['disk','Zapełniony dysk (każdy osobno)',[['pct','od','%']]],['disk_health','Awaria dysku (SMART) lub pula ZFS nie w stanie ONLINE',[]],['ports','Nowy lub zamknięty port TCP (poza lokalnymi)',[]],['cpu','Wysokie CPU',[['pct','od','%'],['minutes','średnio przez',' min']]],['mem','Wysoki RAM',[['pct','od','%'],['minutes','średnio przez',' min']]],
+  ['disk','Zapełniony dysk (każdy osobno)',[['pct','od','%']]],['disk_health','Awaria dysku (SMART) lub pula ZFS nie w stanie ONLINE',[]],['ports','Nowy port otwarty na świat w zaporze ufw (jedno powiadomienie na zmianę)',[]],['cpu','Wysokie CPU',[['pct','od','%'],['minutes','średnio przez',' min']]],['mem','Wysoki RAM',[['pct','od','%'],['minutes','średnio przez',' min']]],
   ['errors','Dużo błędów w logach jednego źródła',[['count','od',' błędów'],['minutes','w ciągu',' min']]]];
 const CHT={ntfy:['ntfy',[['url','Adres tematu, np. https://ntfy.sh/twoj-temat'],['token','Token (opcjonalnie)']]],telegram:['Telegram',[['bot_token','Token bota (od @BotFather)'],['chat_id','Chat ID']]],
   discord:['Discord',[['url','Adres webhooka kanału']]],webhook:['Webhook',[['url','Adres (POST z JSON)']]],email:['E-mail',[['host','Serwer SMTP'],['port','Port (587 albo 465)'],['user','Login'],['password','Hasło'],['from','Nadawca'],['to','Odbiorca']]]};
@@ -1139,7 +1236,7 @@ log.onscroll=()=>{
 for(const b of document.querySelectorAll('#nav button'))b.onclick=()=>{
   const g=b.dataset.go;
   if(g==='cron'){cronHost=null;renderCron();return show(g)}
-  if(g==='over'||g==='notif')return show(g);
+  if(g==='over'||g==='notif'||g==='users')return show(g);
   pick(ALL,{title:g==='err'?'Błędy i ostrzeżenia':'Wszystkie logi',multi:true},g==='err'?'w':'',g==='err'?'1d':null);
 };
 for(const b of document.querySelectorAll('[data-tog]'))b.onclick=()=>document.body.classList.toggle('nos');

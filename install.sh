@@ -10,7 +10,8 @@
 #   opcje: --name NAZWA  --logs "/sciezka/*.log,..."  --no-cron  --no-status  --no-lxc  --no-tailscale
 #
 # Uzytkownicy strony (na centrali; haslo + kod 2FA z aplikacji):
-#   loghub user add NAZWA [--role admin|viewer] | user del|passwd|reset-2fa NAZWA | user list
+#   loghub user add NAZWA [--role admin|viewer] [--hosts pve,vps] | user hosts NAZWA pve,vps|all
+#   loghub user del|passwd|reset-2fa NAZWA | user list   (albo w przegladarce: Uzytkownicy)
 #
 # Dostep z internetu (na centrali, przez Tailscale Funnel):
 #   loghub public on | off | status
@@ -105,6 +106,7 @@ services:
     environment:
       - SESSION_SECRET=${SESSION_SECRET}
       - LOGHUB_DATA=/data
+      - VL_URL=http://victorialogs:9428
     volumes:
       - ./auth:/app:ro
       - ./authdata:/data
@@ -120,6 +122,7 @@ services:
     volumes:
       - ./notify:/app:ro
       - ./notifydata:/data
+      - /etc/localtime:/etc/localtime:ro
     depends_on:
       - victorialogs
     restart: unless-stopped
@@ -154,19 +157,11 @@ EOF
 		header_up X-Forwarded-Proto {args[0]}
 	}
 
-	# ludzie: tylko odczyt, tylko z wazna sesja
-	# (naglowki X-User/X-Role od przegladarki sa usuwane; ustawia je wylacznie usluga logowania)
+	# ludzie: tylko odczyt, przez usluge logowania, ktora sprawdza sesje
+	# i doklada filtr maszyn dla kont z ograniczonym dostepem
 	handle /select/* {
-		route {
-			request_header -X-User
-			request_header -X-Role
-			forward_auth auth:9000 {
-				uri /auth/verify
-				copy_headers X-User X-Role
-			}
-			reverse_proxy victorialogs:9428 {
-				flush_interval -1
-			}
+		reverse_proxy auth:9000 {
+			flush_interval -1
 		}
 	}
 
@@ -175,9 +170,10 @@ EOF
 		route {
 			request_header -X-User
 			request_header -X-Role
+			request_header -X-Hosts
 			forward_auth auth:9000 {
 				uri /auth/verify
-				copy_headers X-User X-Role
+				copy_headers X-User X-Role X-Hosts
 			}
 			reverse_proxy notify:9100
 		}
@@ -327,6 +323,25 @@ cmd_public() {
 
 # ------------------------------------------------------------------ agent
 
+# Vector dziala jako uzytkownik "vector"; katalogi z logami spoza /var/log (np. TeamSpeak w /home/ts3) trzeba mu udostepnic do odczytu.
+grant_log_access() {
+  local dirs="" d p
+  dirs="$(find /opt /srv /home /root /usr/local -maxdepth 6 -type f -name 'ts3server_*.log' -printf '%h\n' 2>/dev/null | sort -u)"
+  local IFS=','
+  for p in $EXTRA_LOGS; do [ -n "$p" ] && dirs="$dirs"$'\n'"$(dirname "$p")"; done
+  unset IFS
+  dirs="$(printf '%s\n' "$dirs" | grep -v '^$' | sort -u)"
+  [ -n "$dirs" ] || return 0
+  getent passwd vector >/dev/null || return 0
+  have setfacl || apt-get install -y -qq acl >/dev/null 2>&1 || { warn "brak setfacl - Vector moze nie miec dostepu do: $dirs"; return 0; }
+  while read -r d; do
+    [ -d "$d" ] || continue
+    # wejscie do katalogow nadrzednych i odczyt logow (takze nowych plikow)
+    p="$d"; while [ "$p" != "/" ]; do setfacl -m u:vector:x "$p" 2>/dev/null || true; p="$(dirname "$p")"; done
+    setfacl -R -m u:vector:rX "$d" 2>/dev/null && setfacl -d -m u:vector:rX "$d" 2>/dev/null || warn "nie udalo sie nadac dostepu do $d"
+  done <<< "$dirs"
+}
+
 write_vector_config() {
   local cfg=/etc/vector/vector.yaml inputs=""
   mkdir -p /etc/vector /var/lib/vector
@@ -343,6 +358,10 @@ write_vector_config() {
     echo "    read_from: end"
     echo "    include:"
     echo "      - /var/log/**/*.log"
+    # logi znanych programow poza /var/log (TeamSpeak 3)
+    find /opt /srv /home /root /usr/local -maxdepth 6 -type f -name 'ts3server_*.log' -printf '%h\n' 2>/dev/null | sort -u | while read -r d; do
+      echo "      - \"$d/*.log\""
+    done
     local IFS=','
     for p in $EXTRA_LOGS; do
       [ -n "$p" ] && echo "      - \"$p\""
@@ -382,6 +401,7 @@ EOF
           if is_array(r.pools) { r.pools = encode_json(r.pools) }
           if is_array(r.smart) { r.smart = encode_json(r.smart) }
           if is_array(r.ports) { r.ports = encode_json(r.ports) }
+          if is_array(r.ufw) { r.ufw = encode_json(r.ufw) }
           out = merge(out, r)
           out.host = "$NAME"
         }
@@ -645,6 +665,25 @@ while :; do
         printf "%s[\"%s\",\"%s\",%d,\"%s\"]", (n++ ? "," : ""), $1, a, port, pr }')
     extra="$extra,\"ports\":[${po}]"
   fi
+  # zapora ufw: stan i reguly ALLOW otwarte dla calego swiata (From = Anywhere)
+  if command -v ufw >/dev/null 2>&1; then
+    uo=$(timeout 10 ufw status 2>/dev/null)
+    if echo "$uo" | grep -q '^Status: active'; then
+      ur=$(echo "$uo" | awk '
+        /^--/ { t = 1; next }
+        t && NF {
+          line = $0; gsub(/ \(v6\)/, "", line)
+          if (match(line, /[ \t]+(ALLOW|LIMIT)( IN)?[ \t]+/)) {
+            to = substr(line, 1, RSTART - 1); from = substr(line, RSTART + RLENGTH)
+            gsub(/^[ \t]+|[ \t]+$/, "", to); gsub(/^[ \t]+|[ \t]+$/, "", from); gsub(/"/, "", to)
+            if (from ~ /^Anywhere/ && to !~ / on tailscale/ && !(to in seen)) { seen[to] = 1; printf "%s\"%s\"", (n++ ? "," : ""), to }
+          }
+        }')
+      extra="$extra,\"ufw_state\":\"active\",\"ufw\":[${ur}]"
+    else
+      extra="$extra,\"ufw_state\":\"inactive\",\"ufw\":[]"
+    fi
+  fi
   if command -v pvesh >/dev/null 2>&1; then
     g=$(timeout 20 pvesh get /cluster/resources --type vm --output-format json 2>/dev/null)
     case "$g" in \[*) extra="$extra,\"guests\":$g" ;; esac
@@ -750,6 +789,7 @@ cmd_agent() {
 
   setup_cron
   setup_status
+  grant_log_access
   write_vector_config
   if [ "$JSON_VRL" = 1 ] && ! vector validate --no-environment /etc/vector/vector.yaml >/dev/null 2>&1; then
     # czesc dla crona i zasobow nie moze zablokowac zbierania zwyklych logow

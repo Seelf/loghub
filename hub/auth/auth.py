@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
-"""loghub auth - logowanie haslem i kodem TOTP (2FA), sesja w podpisanym ciasteczku.
+"""loghub auth - logowanie haslem i kodem TOTP (2FA), sesja w podpisanym ciasteczku,
+konta z dostepem do wybranych maszyn i posrednik do bazy logow, ktory ten dostep egzekwuje.
 
 Tylko biblioteka standardowa Pythona. Dwa tryby:
-  auth.py serve                      serwer HTTP dla Caddy (forward_auth + /auth/*)
-  auth.py user add NAZWA [--role admin|viewer]
+  auth.py serve                      serwer HTTP dla Caddy (forward_auth, /auth/*, /select/*)
+  auth.py user add NAZWA [--role admin|viewer] [--hosts pve,vps]
+  auth.py user hosts NAZWA pve,vps|all
   auth.py user del|passwd|reset-2fa NAZWA
   auth.py user list
 """
@@ -11,6 +13,7 @@ import base64
 import fcntl
 import hashlib
 import hmac
+import http.client
 import json
 import os
 import re
@@ -20,7 +23,7 @@ import sys
 import threading
 import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
-from urllib.parse import quote
+from urllib.parse import parse_qsl, quote, urlencode, urlsplit
 
 DATA = os.environ.get("LOGHUB_DATA", "/data")
 USERS = os.path.join(DATA, "users.json")
@@ -30,6 +33,8 @@ COOKIE = "loghub"
 ISSUER = "loghub"
 NAME_RE = re.compile(r"^[a-z0-9_-]{2,32}$")
 MAX_FAILS = 5  # tyle nieudanych prob z rzedu wolno bez blokady
+VL = urlsplit(os.environ.get("VL_URL", "http://victorialogs:9428"))
+HOST_RE = re.compile(r"^[A-Za-z0-9._-]{1,64}$")
 
 # ---------------------------------------------------------------- uzytkownicy
 
@@ -77,7 +82,30 @@ def check_pw(pw, stored):
         return False
 
 
-DUMMY = hash_pw(secrets.token_hex(8))  # dla nieistniejacych kont, zeby czas odpowiedzi byl ten sam
+DUMMY = hash_pw(secrets.token_hex(8))
+
+
+def user_hosts(u):
+    """None = wszystkie maszyny; lista = tylko te (administrator widzi zawsze wszystko)."""
+    if u.get("role") == "admin":
+        return None
+    h = u.get("hosts")
+    return h if isinstance(h, list) else None
+
+
+def clean_hosts(v):
+    if v in (None, "", "all", "*") or v == ["*"]:
+        return None
+    items = v.split(",") if isinstance(v, str) else list(v)
+    out = sorted({str(x).strip() for x in items if str(x).strip()})
+    for x in out:
+        if not HOST_RE.match(x):
+            raise ValueError("niedozwolona nazwa maszyny: %s" % x)
+    return out
+
+
+def user_info(name, u):
+    return {"user": name, "role": u.get("role", "viewer"), "hosts": user_hosts(u), "totp": bool(u.get("totp"))}  # dla nieistniejacych kont, zeby czas odpowiedzi byl ten sam
 
 # ----------------------------------------------------------------------- TOTP
 
@@ -197,7 +225,7 @@ def login(body):
             note_fail(name)
             return 401, {"error": "bad"}, None
         note_ok(name)
-        return 200, {"user": name, "role": u.get("role", "viewer")}, name
+        return 200, user_info(name, u), name
 
     # pierwsze logowanie: haslo sie zgadza, trzeba jeszcze podpiac aplikacje z kodami
     with Store() as s:
@@ -213,7 +241,7 @@ def login(body):
             return 401, {"error": "code", "enroll": info}, None
         u["totp"], u["step"] = u.pop("pending"), step
     note_ok(name)
-    return 200, {"user": name, "role": u.get("role", "viewer")}, name
+    return 200, user_info(name, u), name
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -250,27 +278,175 @@ class Handler(BaseHTTPRequestHandler):
                 users = load()
                 name = read_session(v, users)
                 if name:
-                    return name, users[name].get("role", "viewer")
+                    return name, users[name].get("role", "viewer"), user_hosts(users[name])
         return None
+
+    def json_body(self, limit=4096):
+        n = int(self.headers.get("Content-Length", "0"))
+        if n > limit:
+            raise ValueError("too large")
+        body = json.loads(self.rfile.read(n) or b"{}")
+        if not isinstance(body, dict):
+            raise ValueError("bad request")
+        return body
+
+    # ------------------------------------------------ posrednik do bazy logow
+    def proxy(self):
+        """Przekazuje zapytanie do VictoriaLogs. Dla konta z ograniczonym dostepem dokleja filtr maszyn
+        (extra_stream_filters), ktorego nie da sie obejsc tresca zapytania; sam strumien odpowiedzi idzie dalej na zywo."""
+        who = self.current()
+        if not who:
+            return self.send(401, {"error": "auth"})
+        parts = urlsplit(self.path)
+        hosts = who[2]
+        n = int(self.headers.get("Content-Length", "0") or 0)
+        if n > 1048576:
+            return self.send(413, {"error": "too large"})
+        raw = self.rfile.read(n) if n else b""
+        headers = {"Accept-Encoding": "identity"}
+        if hosts is None:
+            method, url, body = self.command, parts.path + ("?" + parts.query if parts.query else ""), raw or None
+            if self.headers.get("Content-Type"):
+                headers["Content-Type"] = self.headers["Content-Type"]
+        else:
+            if not parts.path.startswith("/select/logsql/"):
+                return self.send(403, {"error": "brak dostępu do tego widoku"})
+            form = parse_qsl(parts.query, keep_blank_values=True) + parse_qsl(raw.decode("utf-8", "replace"), keep_blank_values=True)
+            form = [(k, v) for k, v in form if k not in ("extra_filters", "extra_stream_filters")]
+            # postac JSON z dokumentacji VictoriaLogs: {"host": [..]} oznacza {host in (..)}
+            form.append(("extra_stream_filters", json.dumps({"host": hosts or ["-brak-dostepu-"]})))
+            method, url, body = "POST", parts.path, urlencode(form).encode()
+            headers["Content-Type"] = "application/x-www-form-urlencoded"
+        conn = http.client.HTTPConnection(VL.hostname, VL.port or 80, timeout=3600)
+        try:
+            conn.request(method, url, body=body, headers=headers)
+            r = conn.getresponse()
+            self.send_response(r.status)
+            for k, v in r.getheaders():
+                if k.lower() in ("content-type", "cache-control", "vl-request-duration-seconds"):
+                    self.send_header(k, v)
+            self.send_header("Transfer-Encoding", "chunked")
+            self.end_headers()
+            while True:
+                chunk = r.read1(65536)
+                if not chunk:
+                    break
+                self.wfile.write(b"%x\r\n%s\r\n" % (len(chunk), chunk))
+                self.wfile.flush()
+            self.wfile.write(b"0\r\n\r\n")
+        except (BrokenPipeError, ConnectionResetError):
+            pass
+        except OSError as e:
+            try:
+                self.send(502, {"error": "baza logów niedostępna: %s" % e})
+            except OSError:
+                pass
+        finally:
+            conn.close()
+        self.close_connection = True
+
+    # ------------------------------------------------------ konta (administrator)
+    def users_api(self):
+        who = self.current()
+        if not who:
+            return self.send(401, {"error": "auth"})
+        if who[1] != "admin":
+            return self.send(403, {"error": "tylko administrator"})
+        path = self.path.split("?")[0].rstrip("/")
+        name = path[len("/auth/users/"):].lower() if path.startswith("/auth/users/") else ""
+        if self.command == "GET" and not name:
+            return self.send(200, {"users": [user_info(n, u) for n, u in sorted(load().items())]})
+        if self.command != "GET" and "application/json" not in self.headers.get("Content-Type", ""):
+            return self.send(415, {"error": "wymagany JSON"})
+        try:
+            body = self.json_body() if self.command in ("POST", "PUT") else {}
+            with Store() as s:
+                if self.command == "POST" and not name:
+                    name = str(body.get("user", "")).strip().lower()
+                    if not NAME_RE.match(name):
+                        raise ValueError("nazwa: 2-32 znaki z zestawu a-z 0-9 _ -")
+                    if name in s.users:
+                        raise ValueError("taki użytkownik już istnieje")
+                    role = body.get("role", "viewer")
+                    if role not in ("admin", "viewer"):
+                        raise ValueError("rola: admin albo viewer")
+                    pw = new_password()
+                    s.users[name] = {"pw": hash_pw(pw), "role": role}
+                    h = clean_hosts(body.get("hosts"))
+                    if h is not None:
+                        s.users[name]["hosts"] = h
+                    out = dict(user_info(name, s.users[name]), password=pw)
+                    self.say("user-add %s by" % name, who[0])
+                    return self.send(200, out)
+                u = s.users.get(name)
+                if not u:
+                    return self.send(404, {"error": "nie ma takiego użytkownika"})
+                admins = sum(1 for x in s.users.values() if x.get("role") == "admin")
+                if self.command == "DELETE":
+                    if name == who[0]:
+                        raise ValueError("nie można usunąć własnego konta")
+                    if u.get("role") == "admin" and admins < 2:
+                        raise ValueError("nie można usunąć ostatniego administratora")
+                    del s.users[name]
+                    self.say("user-del %s by" % name, who[0])
+                    return self.send(200, {"ok": True})
+                if self.command == "PUT":
+                    out = {}
+                    if "role" in body:
+                        if body["role"] not in ("admin", "viewer"):
+                            raise ValueError("rola: admin albo viewer")
+                        if u.get("role") == "admin" and body["role"] != "admin" and admins < 2:
+                            raise ValueError("musi zostać co najmniej jeden administrator")
+                        u["role"] = body["role"]
+                    if "hosts" in body:
+                        h = clean_hosts(body.get("hosts"))
+                        if h is None:
+                            u.pop("hosts", None)
+                        else:
+                            u["hosts"] = h
+                    if body.get("new_password"):
+                        out["password"] = new_password()
+                        u["pw"] = hash_pw(out["password"])
+                    if body.get("reset_2fa"):
+                        u.pop("totp", None), u.pop("pending", None), u.pop("step", None)
+                    self.say("user-edit %s by" % name, who[0])
+                    return self.send(200, dict(user_info(name, u), **out))
+        except ValueError as e:
+            return self.send(400, {"error": str(e)})
+        self.send(405, {"error": "method"})
 
     def do_GET(self):
         path = self.path.split("?")[0]
+        if path.startswith("/select/"):
+            return self.proxy()
+        if path.startswith("/auth/users"):
+            return self.users_api()
         if path in ("/auth/verify", "/auth/me"):
             who = self.current()
             if who:
-                return self.send(200, {"user": who[0], "role": who[1]}, [("X-User", who[0]), ("X-Role", who[1])])
+                hs = "*" if who[2] is None else ",".join(who[2])
+                return self.send(200, {"user": who[0], "role": who[1], "hosts": who[2]}, [("X-User", who[0]), ("X-Role", who[1]), ("X-Hosts", hs or "-")])
             return self.send(401, {"error": "auth"})
+        self.send(404, {"error": "not found"})
+
+    def do_PUT(self):
+        if self.path.startswith("/auth/users"):
+            return self.users_api()
+        self.send(404, {"error": "not found"})
+
+    def do_DELETE(self):
+        if self.path.startswith("/auth/users"):
+            return self.users_api()
         self.send(404, {"error": "not found"})
 
     def do_POST(self):
         path = self.path.split("?")[0]
+        if path.startswith("/select/"):
+            return self.proxy()
+        if path.startswith("/auth/users"):
+            return self.users_api()
         try:
-            n = int(self.headers.get("Content-Length", "0"))
-            if n > 4096:
-                return self.send(413, {"error": "too large"})
-            body = json.loads(self.rfile.read(n) or b"{}")
-            if not isinstance(body, dict):
-                raise ValueError
+            body = self.json_body()
         except ValueError:
             return self.send(400, {"error": "bad request"})
         if path == "/auth/login":
@@ -301,9 +477,12 @@ def cli(args):
     action = args[0] if args else "list"
     name = args[1].lower() if len(args) > 1 else ""
     role = args[args.index("--role") + 1] if "--role" in args[:-1] else "viewer"
+    hosts_arg = args[args.index("--hosts") + 1] if "--hosts" in args[:-1] else None
     if action == "list":
         for n, u in sorted(load().items()):
-            print("%-20s %-7s 2FA: %s" % (n, u.get("role", "viewer"), "tak" if u.get("totp") else "ustawi przy pierwszym logowaniu"))
+            h = user_hosts(u)
+            print("%-20s %-7s 2FA: %-4s maszyny: %s" % (n, u.get("role", "viewer"), "tak" if u.get("totp") else "nie",
+                                                        "wszystkie" if h is None else (", ".join(h) or "zadna")))
         return
     if not NAME_RE.match(name):
         sys.exit("nazwa: 2-32 znaki z zestawu a-z 0-9 _ -")
@@ -316,7 +495,11 @@ def cli(args):
                 sys.exit("taki uzytkownik juz istnieje (uzyj: user passwd %s)" % name)
             pw = new_password()
             s.users[name] = {"pw": hash_pw(pw), "role": role}
-            print("Login: %s\nHaslo: %s\nRola:  %s\n2FA ustawi sie przy pierwszym logowaniu." % (name, pw, role))
+            h = clean_hosts(hosts_arg)
+            if h is not None:
+                s.users[name]["hosts"] = h
+            print("Login: %s\nHaslo: %s\nRola:  %s\nMaszyny: %s\n2FA ustawi sie przy pierwszym logowaniu."
+                  % (name, pw, role, "wszystkie" if h is None or role == "admin" else ", ".join(h)))
         elif not u:
             sys.exit("nie ma takiego uzytkownika")
         elif action == "del":
@@ -328,11 +511,18 @@ def cli(args):
             pw = new_password()
             u["pw"] = hash_pw(pw)
             print("Login: %s\nNowe haslo: %s\nDotychczasowe sesje tego konta wygasly." % (name, pw))
+        elif action == "hosts":
+            h = clean_hosts(args[2] if len(args) > 2 else "all")
+            if h is None:
+                u.pop("hosts", None)
+            else:
+                u["hosts"] = h
+            print("%s widzi teraz: %s" % (name, "wszystkie maszyny" if h is None else ", ".join(h)))
         elif action == "reset-2fa":
             u.pop("totp", None), u.pop("pending", None), u.pop("step", None)
             print("%s ustawi 2FA od nowa przy najblizszym logowaniu. Dotychczasowe sesje wygasly." % name)
         else:
-            sys.exit("uzycie: user add|del|passwd|reset-2fa NAZWA [--role admin|viewer] | user list")
+            sys.exit("uzycie: user add NAZWA [--role admin|viewer] [--hosts a,b] | user hosts NAZWA a,b|all | user del|passwd|reset-2fa NAZWA | user list")
 
 
 if __name__ == "__main__":
