@@ -340,7 +340,7 @@ grant_log_access() {
   local IFS=','
   for p in $EXTRA_LOGS; do [ -n "$p" ] && dirs="$dirs"$'\n'"$(dirname "$p")"; done
   unset IFS
-  dirs="$(printf '%s\n' "$dirs" | grep -v '^$' | sort -u)"
+  dirs="$(printf '%s\n' "$dirs" | sed '/^$/d' | sort -u)"
   [ -n "$dirs" ] || return 0
   getent passwd vector >/dev/null || return 0
   have setfacl || apt-get install -y -qq acl >/dev/null 2>&1 || { warn "brak setfacl - Vector moze nie miec dostepu do: $dirs"; return 0; }
@@ -834,7 +834,7 @@ cmd_agent() {
   setup_cron
   setup_status
   # aktywne katalogi z logami TeamSpeak 3 (pliki zmieniane w ostatnich 30 dniach; stare kopie pomijamy)
-  TS3_DIRS="$(find /opt /srv /home /root /usr/local /var/lib -maxdepth 6 -type f -name 'ts3server_*.log' -mtime -30 -printf '%h\n' 2>/dev/null | sort -u)"
+  TS3_DIRS="$( { find /opt /srv /home /root /usr/local /var/lib -xdev -maxdepth 6 -type f -name 'ts3server_*.log' -mtime -30 -printf '%h\n' 2>/dev/null || true; } | sort -u)"
   TS3_PARSE=1
   [ -n "$TS3_DIRS" ] && say "Logi TeamSpeak 3: $(echo "$TS3_DIRS" | paste -sd' ' -)"
   grant_log_access
