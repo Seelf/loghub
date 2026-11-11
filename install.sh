@@ -375,7 +375,7 @@ write_vector_config() {
     unset IFS
     echo "    exclude:"
     echo "      - /var/log/journal/**"
-    # TeamSpeak 3: osobne zrodlo, czytane od poczatku biezacych plikow (do 2 lat wstecz), z czasem z linii logu
+    # TeamSpeak 3: osobne zrodlo, czytane od poczatku biezacych plikow (do 2 lat wstecz), z czasem z linii logu (TS3 zapisuje czas w UTC)
     if [ -n "$TS3_DIRS" ]; then
       echo "  ts3:"
       echo "    type: file"
@@ -437,7 +437,7 @@ EOF
       lvl = ""
       p, err = parse_regex(msg, r'^(?P<t>[0-9]{4}-[0-9]{2}-[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2}(\.[0-9]+)?)\|(?P<l>[A-Z]+) *\|(?P<r>.*)\$')
       if err == null {
-        t2, e2 = parse_timestamp(string!(p.t), "%Y-%m-%d %H:%M:%S%.f")
+        t2, e2 = parse_timestamp(string!(p.t) + " +0000", "%Y-%m-%d %H:%M:%S%.f %z")
         if e2 == null { ts = t2 }
         l = string!(p.l)
         lvl = if l == "ERROR" || l == "CRITICAL" { "3" } else if l == "WARNING" { "4" } else if l == "INFO" { "6" } else { "7" }
