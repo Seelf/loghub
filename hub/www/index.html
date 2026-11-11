@@ -92,7 +92,8 @@ main{flex:1;min-width:0;display:flex;flex-direction:column}
 .tiles div{display:flex;flex-direction:column}
 .tiles b{font-size:24px;font-weight:650;font-variant-numeric:tabular-nums}
 .tiles .e b{color:var(--err)}.tiles .w b{color:var(--acc2)}.tiles .g b{color:var(--acc)}
-#cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px}
+#cards{columns:340px;column-gap:12px}
+#cards>.card{break-inside:avoid;margin-bottom:12px}
 .card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px;display:flex;flex-direction:column;gap:10px}
 .card.off{border-color:var(--warn)}
 .card header{display:flex;align-items:center;gap:8px}
@@ -555,9 +556,9 @@ async function loadHist(){
   }catch{}
 }
 function sparkPct(box,v,stepMs){
-  box.textContent='';const end=Date.now();
+  box.textContent='';const end=Date.now(),top=Math.max(25,...v.filter(x=>x!=null));
   v.forEach((x,i)=>{
-    const b=el('i',x==null?'z':lvlc(x)==='e'?'e':'');b.style.height=x==null?'':Math.max(6,Math.round(x))+'%';
+    const b=el('i',x==null?'z':lvlc(x)==='e'?'e':'');b.style.height=x==null?'':Math.max(6,Math.round(x/top*100))+'%';
     if(lvlc(x||0)==='w')b.style.background='var(--warn)';
     const d=new Date(end-(v.length-1-i)*stepMs);b.title=pad(d.getHours())+':'+pad(d.getMinutes())+' · CPU '+(x==null?'brak pomiaru':pc(x));
     box.append(b);
