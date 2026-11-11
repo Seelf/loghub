@@ -116,6 +116,15 @@ pule ZFS, stan SMART fizycznych dysków (co 10 min, na maszynach fizycznych; age
 oraz nasłuchujące porty TCP/UDP z nazwą procesu i reguły zapory ufw otwarte na świat. Strona odświeża zasoby co 15 s.
 Maszyny będące kontenerami LXC/VM Proxmoxa pokazują się w drzewie pod swoim hostem (dopasowanie po nazwie).
 
+## Zdarzenia zamiast liczby błędów
+
+Strona nie pokazuje surowej liczby linii z błędami, tylko zdarzenia. Zdarzenie to:
+- skok: godziny, w których źródło sypie błędami co najmniej 4 razy powyżej swojej normy (75. percentyl z 7 dni, minimum 5 na godzinę); sąsiednie godziny sklejają się w jedno zdarzenie,
+- nowy błąd: rodzaj komunikatu (liczby zwinięte do `<N>`), którego to źródło nie wypisywało w ciągu 14 dni wcześniej; ponad 12 nowych naraz to jedno zdarzenie (nowe źródło albo duża zmiana).
+
+Zakładka Przegląd → Zdarzenia pokazuje pasek godzin albo dni (24 h, 7, 30, 90 dni); klik w dzień zawęża listę, a „Logi” otwiera błędy z okna danego zdarzenia.
+Źródła z błędami w co najmniej połowie godzin trafiają do sekcji „Stały szum” i można je wyciszyć (zapamiętuje to przeglądarka).
+
 ## Powiadomienia
 
 Usługa `notify` na centrali co minutę sprawdza: brak kontaktu z maszyną, padnięte kontenery i usługi, błędy

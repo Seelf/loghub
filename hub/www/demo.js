@@ -155,15 +155,17 @@
   }
   const passes = (p, o) => p.pass(o.level == null ? null : +o.level, o._msg);
 
-  function history(q, limit) {
+  function history(q, limit, body) {
     const p = parse(q), now = Date.now(), out = [];
+    // okno czasu z parametrow start/end (logi z jednego zdarzenia)
+    const t1 = body && body.get('end') ? Math.min(now, Date.parse(body.get('end'))) : now, ms = body && body.get('start') ? t1 - Date.parse(body.get('start')) : p.ms;
     for (const u of U.filter(p.match)) {
       if (u[1] === 'cron') {
         const per = H / u[3];
         for (let slot = Math.floor(now / per), k = 0; slot * per > now - p.ms && k < 300; slot--, k++) { const o = cronRun(u, slot); if (Date.parse(o._time) <= now) out.push(o); }
         continue;
       }
-      const end = u[0] === OFFLINE ? now - 48 * H : now, span = Math.min(p.ms - (now - end), 400 / u[3] * H);
+      const end = u[0] === OFFLINE ? Math.min(t1, now - 48 * H) : t1, span = Math.min(ms - (t1 - end), 400 / u[3] * H);
       if (span <= 0) continue;
       for (let i = Math.ceil(u[3] * span / H); i > 0; i--) out.push(line(u, end - Math.random() * span));
     }
@@ -267,10 +269,17 @@
           const defs = U.filter(u => u[1] === 'cron').map(u => ({ host: u[0], unit: u[2], s: u[5].s, f: u[5].f, u: u[5].u })).concat(NEVER);
           return new Response(ndjson(defs.map(x => ({ _time: new Date(Date.now() - 3 * H).toISOString(), host: x.host, source: 'crondef', unit: x.unit, cron_sched: x.s, cron_file: x.f, cron_user: x.u, cron_cmd: x.unit, cron_scan: '1' }))));
         }
+        // rodzaje bledow (collapse_nums): kilka zrodel ma "nowe" bledy z ostatniej doby, reszta jest stara
+        if (q.includes('collapse_nums')) {
+          const p = parse(q), now = Date.now();
+          const errs = U.filter(u => p.match(u) && u[1] !== 'cron').flatMap(u => u[4].filter(m => cls(m[0], m[1]) === 'e').map(m => ({ u, m: m[1].replace(/\{[a-z]+\}/g, '<N>') })));
+          if (q.includes('by (_msg)')) return new Response(ndjson(errs.slice(0, 3).map((x, i) => ({ _msg: x.m, c: String(48 >> i) }))));
+          return new Response(ndjson(errs.map((x, i) => ({ host: x.u[0], source: x.u[1], unit: x.u[2], _msg: x.m, first: new Date(i % 4 === 1 ? now - (2 + i) * H : now - 9 * 24 * H).toISOString(), c: String(3 + i) }))));
+        }
         if (q.includes('| stats'))
-          return new Response(ndjson(U.filter(u => !idle(u)).map(u => ({ host: u[0], source: u[1], unit: u[2], c: '1' }))));
+          return new Response(ndjson(U.filter(u => q.includes('_time:7d') || !idle(u)).map(u => ({ host: u[0], source: u[1], unit: u[2], c: '1', t: new Date(u[0] === OFFLINE ? Date.now() - 48 * H : Date.now() - 60e3).toISOString() }))));
         await new Promise(ok => setTimeout(ok, 120));
-        return new Response(ndjson(history(q, +body.get('limit') || 1000)));
+        return new Response(ndjson(history(q, +body.get('limit') || 1000, body)));
       }
       if (path === 'tail') {
         const p = parse(q), pool = U.filter(u => p.match(u) && u[0] !== OFFLINE && u[1] !== 'cron'), enc = new TextEncoder();

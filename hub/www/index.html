@@ -119,8 +119,25 @@ main{flex:1;min-width:0;display:flex;flex-direction:column}
 .vol{display:flex;align-items:center;gap:8px}
 .vol i{height:4px;border-radius:2px;background:var(--acc);min-width:1px}
 .vol span{font-variant-numeric:tabular-nums;width:44px;flex:none;text-align:right}
-#errs{border:1px solid var(--line);border-radius:12px;background:var(--card);padding:6px 0;font:12px/1.55 var(--mono)}
-#errs .r{cursor:pointer}
+#errs{display:flex;flex-direction:column;gap:12px}
+.itools{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.days{display:flex;gap:3px;overflow-x:auto;padding-bottom:2px}
+.days button{flex:1 0 24px;min-width:24px;height:46px;padding:3px 1px;display:flex;flex-direction:column;justify-content:space-between;align-items:center;font-size:10px;color:var(--mut)}
+.days button b{font-size:13px;color:var(--fg);font-variant-numeric:tabular-nums}
+.days button.l1{background:var(--warnbg);border-color:var(--warn)}.days button.l2{background:var(--errbg);border-color:var(--err)}
+.days button.l3{background:var(--err);border-color:var(--err);color:var(--bg)}.days button.l3 b{color:var(--bg)}
+.days button.on{outline:2px solid var(--acc);outline-offset:1px}
+.ilist{border:1px solid var(--line);border-radius:12px;background:var(--card)}
+.inc{display:grid;grid-template-columns:170px minmax(0,1fr) auto;gap:4px 14px;padding:9px 14px;border-bottom:1px solid var(--line);align-items:center}
+.inc:last-child{border-bottom:0}
+.inc .when{font-variant-numeric:tabular-nums;color:var(--mut)}
+.inc .what{display:flex;flex-wrap:wrap;gap:6px;align-items:center;min-width:0}
+.inc .what b{font-family:var(--mono);font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%}
+.inc .msgs{grid-column:2/4;font:12px/1.5 var(--mono);color:var(--mut);display:flex;flex-direction:column;gap:2px;min-width:0}
+.inc .msgs>div{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.inc .msgs button{align-self:flex-start;font:12px var(--sans);padding:1px 8px}
+.tiles .go{cursor:pointer}
+@media(max-width:700px){.inc{grid-template-columns:1fr}.inc .msgs{grid-column:auto}}
 #notv{flex:1;overflow:auto;padding:18px 22px 28px;display:flex;flex-direction:column;gap:14px}
 #notv>header{display:flex;align-items:flex-start;gap:10px}
 #notv>*,#cronv>*,#over>*{flex:none}
@@ -271,17 +288,26 @@ mark{background:var(--hl);color:inherit;border-radius:2px}
   <section id="over">
     <header><button class="tog" data-tog title="Pokaż lub ukryj panel">☰</button><div><h1>Przegląd</h1><div class="mut" id="osub">Stan serwerów i źródeł logów z ostatnich 24 godzin.</div></div></header>
     <div id="tiles" class="tiles"></div>
-    <div id="tabs"><button data-tab="hosts" class="on">Serwery</button><button data-tab="units">Źródła</button><button data-tab="res">Zasoby</button><button data-tab="disks">Dyski</button><button data-tab="ports">Porty</button><button data-tab="errs">Ostatnie błędy</button></div>
+    <div id="tabs"><button data-tab="hosts" class="on">Serwery</button><button data-tab="units">Źródła</button><button data-tab="res">Zasoby</button><button data-tab="disks">Dyski</button><button data-tab="ports">Porty</button><button data-tab="errs">Zdarzenia</button></div>
     <div id="cards"></div>
     <div id="units" hidden>
       <div id="tools">
         <input id="us" placeholder="szukaj źródła lub serwera" aria-label="Szukaj źródła">
-        <select id="usort" aria-label="Sortuj według"><option value="e24">błędy 24 h</option><option value="c24">linie 24 h</option><option value="last">ostatni log</option><option value="unit">nazwa</option></select>
+        <select id="usort" aria-label="Sortuj według"><option value="inc">zdarzenia 24 h</option><option value="c24">linie 24 h</option><option value="last">ostatni log</option><option value="unit">nazwa</option></select>
         <select id="udir" aria-label="Kolejność"><option value="-1">malejąco</option><option value="1">rosnąco</option></select>
       </div>
       <div id="tbl" style="margin-top:10px"></div>
     </div>
-    <div id="errs" hidden></div>
+    <div id="errs" hidden>
+      <div class="itools">
+        <select id="ir" aria-label="Okres"><option value="1d">ostatnie 24 godz.</option><option value="7d">7 dni</option><option value="30d">30 dni</option><option value="90d">90 dni</option></select>
+        <select id="ih" aria-label="Serwer"><option value="">wszystkie serwery</option></select>
+        <span class="mut" id="imsg"></span>
+      </div>
+      <div id="idays" class="days"></div>
+      <div id="ilist" class="ilist"></div>
+      <div id="inoise" style="display:flex;flex-direction:column;gap:8px"></div>
+    </div>
     <div id="resv" hidden>
       <div id="rtools" style="display:flex;flex-wrap:wrap;gap:8px">
         <input id="rs" placeholder="szukaj maszyny, kontenera lub usługi" aria-label="Szukaj" style="flex:1 1 200px">
@@ -364,7 +390,7 @@ mark{background:var(--hl);color:inherit;border-radius:2px}
       <button class="tog" data-tog title="Pokaż lub ukryj panel">☰</button>
       <div id="title"></div>
       <div class="stat"><div><div class="lbl">Linie / min</div><b id="rate">–</b></div><div class="sp" id="rsp"></div></div>
-      <div class="stat"><div><div class="lbl">Błędy 24 h</div><b id="e24">–</b></div></div>
+      <div class="stat"><div><div class="lbl">Zdarzenia 24 h</div><b id="e24">–</b></div></div>
       <div class="stat" id="resbox" hidden><div><div class="lbl" id="reslbl">Zasoby</div><b id="resval">–</b></div></div>
       <button id="live" aria-pressed="true"><i class="dot"></i><span>Na żywo</span></button>
     </div>
@@ -472,44 +498,137 @@ async function hits(query,from,step,fields=[]){
 }
 const last24=v=>{const a=v.slice(-24);while(a.length<24)a.unshift(0);return a};
 
+// ciezsze zapytania (7 dni, wzorce bledow, cron) ida rzadziej i w tle, zeby strona rysowala sie od razu
+const I={base:new Map(),baseOk:false,baseT:0,news:[],newsT:0,seen:new Map(),seenT:0,cronT:0,defs:null,defsT:0};
+const iso=t=>new Date(t).toISOString();
+let MUTE=new Set();try{MUTE=new Set(JSON.parse(localStorage.getItem('loghub.mute')||'[]'))}catch{}
+const saveMute=()=>{try{localStorage.setItem('loghub.mute',JSON.stringify([...MUTE]))}catch{}};
+const vis=x=>!MUTE.has(x.k);
+const pl=(n,a,b,c)=>n===1?a:(n%10>=2&&n%10<=4&&(n%100<10||n%100>=20))?b:c;
+
 async function refresh(){
   if(!me)return;
   try{
     const now=Date.now();
-    const [all,er,wa,up,st]=await Promise.all([
-      hits(EXCL,now-168*H,H,F),
-      hits(ERR,now-24*H,H,F).catch(()=>[]),
-      hits(WARN,now-24*H,H,F).catch(()=>[]),
+    // etap 1: lekkie zapytania - lista zrodel z 24 h, kto pisze teraz, stan maszyn
+    const [all,up,st]=await Promise.all([
+      hits(EXCL,now-24*H,H,F),
       api('query',{query:'_time:5m '+EXCL+' | stats by (host, source, unit) count() c'}).then(r=>r.text()).then(t=>new Set(parseLines(t).map(key))).catch(()=>null),
       api('query',{query:'{source="stat"} _time:10m',limit:500}).then(r=>r.text()).then(parseLines).catch(()=>[])]);
-    D.stat=readStat(st);
-    const E=new Map(er.map(h=>[key(h.f),h])),W=new Map(wa.map(h=>[key(h.f),h]));
-    D.units=all.filter(h=>h.f.host&&h.f.source!=='crondef'&&h.f.source!=='stat').map(h=>{
-      const f=h.f,k=key(f),ev=E.has(k)?last24(E.get(k).v):null,li=h.v.findLastIndex(x=>x>0),isUp=up?up.has(k):li>=h.v.length-1;
-      return {host:f.host,source:f.source||'?',unit:f.unit||'?',k,c7:h.total,v:last24(h.v),c24:sum(last24(h.v)),ev,e24:ev?sum(ev):0,
-        w24:W.has(k)?sum(last24(W.get(k).v)):0,up:isUp,last:isUp?now:li<0?0:Math.min(now,h.t0+(li+1)*H)};
-    });
-    // kontenery bez logow i padniete uslugi tez maja byc widoczne
-    for(const [host,s] of D.stat){
-      const have=new Set(D.units.filter(u=>u.host===host).map(u=>u.source+'\n'+u.unit));
-      const add=(source,unit)=>{if(!have.has(source+'\n'+unit))D.units.push({host,source,unit,k:host+'\n'+source+'\n'+unit,c7:0,v:new Array(24).fill(0),c24:0,ev:null,e24:0,w24:0,up:false,last:0})};
-      for(const c of s.cmap.keys())add('docker',c);
-      for(const [n,x] of s.umap)if(x[1]==='failed')add('journald',n);
-    }
-    for(const u of D.units){u.sel=selOf(u);[u.st,u.stt]=ustate(u)}
-    D.hosts=new Map();
-    for(const u of D.units){
-      const h=D.hosts.get(u.host)||D.hosts.set(u.host,{name:u.host,units:[],c24:0,e24:0,w24:0,up:false,last:0,v:new Array(24).fill(0),ev:new Array(24).fill(0)}).get(u.host);
-      h.units.push(u);h.c24+=u.c24;h.e24+=u.e24;h.w24+=u.w24;h.up=h.up||u.up;h.last=Math.max(h.last,u.last);
-      if(u.st==='bad')(h.bad=h.bad||[]).push(u);
-      u.v.forEach((x,i)=>{h.v[i]+=x});if(u.ev)u.ev.forEach((x,i)=>{h.ev[i]+=x});
-    }
-    // serwer jest online, gdy agent przyslal stan w ciagu 3 minut (gdy brak pomiarow: gdy pisze logi)
-    for(const h of D.hosts.values()){const s=D.stat.get(h.name);h.bad=h.bad||[];if(s){h.up=now-s.t<3*6e4;h.last=Math.max(h.last,s.t)}}
-    renderTree();renderOver();loadCron();loadHist();
-    if(view==='logs')headStats();
-    if(!D.units.length)status('Brak logów z ostatnich 7 dni. Zainstaluj agenta na pierwszej maszynie.');
+    D.stat=readStat(st);D.all=all;D.up=up;D.now=now;
+    build();paint();loadHist();
+    // etap 2: bledy i ostrzezenia z 24 h
+    const [er,wa]=await Promise.all([hits(ERR+' '+EXCL,now-24*H,H,F).catch(()=>null),hits(WARN+' '+EXCL,now-24*H,H,F).catch(()=>null)]);
+    if(er)D.er=er;if(wa)D.wa=wa;
+    build();paint();
+    // etap 3: w tle i rzadziej
+    if(now-I.seenT>10*6e4)loadSeen();
+    if(now-I.baseT>15*6e4)loadBase();
+    if(now-I.newsT>10*6e4)loadNews();
+    if(now-I.cronT>5*6e4)loadCron();
   }catch(e){status('Nie udało się odświeżyć listy źródeł: '+e.message)}
+}
+function build(){
+  const now=D.now||Date.now(),A=new Map((D.all||[]).map(h=>[key(h.f),h])),E=new Map((D.er||[]).map(h=>[key(h.f),h])),W=new Map((D.wa||[]).map(h=>[key(h.f),h]));
+  D.units=[];
+  for(const k of new Set([...A.keys(),...I.seen.keys()])){
+    const h=A.get(k),f=h?h.f:I.seen.get(k).f;
+    if(!f.host||f.source==='crondef'||f.source==='stat')continue;
+    const li=h?h.v.findLastIndex(x=>x>0):-1,v=h?last24(h.v):new Array(24).fill(0),isUp=D.up?D.up.has(k):!!h&&li>=h.v.length-1;
+    const ev=E.has(k)?last24(E.get(k).v):null,old=I.seen.has(k)?I.seen.get(k).t:0;
+    D.units.push({host:f.host,source:f.source||'?',unit:f.unit||'?',k,v,c24:sum(v),ev,e24:ev?sum(ev):0,
+      w24:W.has(k)?sum(last24(W.get(k).v)):0,up:isUp,last:isUp?now:li<0?old:Math.min(now,h.t0+(li+1)*H)});
+  }
+  // kontenery bez logow i padniete uslugi tez maja byc widoczne
+  for(const [host,s] of D.stat){
+    const have=new Set(D.units.filter(u=>u.host===host).map(u=>u.source+'\n'+u.unit));
+    const add=(source,unit)=>{if(!have.has(source+'\n'+unit))D.units.push({host,source,unit,k:host+'\n'+source+'\n'+unit,v:new Array(24).fill(0),c24:0,ev:null,e24:0,w24:0,up:false,last:0})};
+    for(const c of s.cmap.keys())add('docker',c);
+    for(const [n,x] of s.umap)if(x[1]==='failed')add('journald',n);
+  }
+  // zdarzenia z 24 h: skoki ponad norme zrodla i nowe rodzaje bledow
+  D.base=I.baseOk?I.base:baseOf(D.er||[]);
+  D.inc=incidentsFrom(D.er||[],D.base,now-24*H,I.news);
+  const ic=new Map(),nc=new Map();
+  for(const x of D.inc.filter(vis)){ic.set(x.k,(ic.get(x.k)||0)+1);nc.set(x.k,(nc.get(x.k)||0)+x.news.length)}
+  for(const u of D.units){u.sel=selOf(u);[u.st,u.stt]=ustate(u);u.inc=ic.get(u.k)||0;u.nnew=nc.get(u.k)||0;u.norm=D.base.get(u.k)||null}
+  D.hosts=new Map();
+  for(const u of D.units){
+    const h=D.hosts.get(u.host)||D.hosts.set(u.host,{name:u.host,units:[],c24:0,e24:0,w24:0,inc:0,nnew:0,up:false,last:0,v:new Array(24).fill(0),ev:new Array(24).fill(0)}).get(u.host);
+    h.units.push(u);h.c24+=u.c24;h.e24+=u.e24;h.w24+=u.w24;h.inc+=u.inc;h.nnew+=u.nnew;h.up=h.up||u.up;h.last=Math.max(h.last,u.last);
+    if(u.st==='bad')(h.bad=h.bad||[]).push(u);
+    u.v.forEach((x,i)=>{h.v[i]+=x});if(u.ev)u.ev.forEach((x,i)=>{h.ev[i]+=x});
+  }
+  // serwer jest online, gdy agent przyslal stan w ciagu 3 minut (gdy brak pomiarow: gdy pisze logi)
+  for(const h of D.hosts.values()){const s=D.stat.get(h.name);h.bad=h.bad||[];if(s){h.up=now-s.t<3*6e4;h.last=Math.max(h.last,s.t)}}
+}
+function paint(){
+  const sc=tree.scrollTop;renderTree();tree.scrollTop=sc;renderOver();
+  if(view==='logs')headStats();
+  if(!D.units.length&&I.seenT)status('Brak logów z ostatnich 7 dni. Zainstaluj agenta na pierwszej maszynie.');
+}
+// zrodla, ktore milcza dluzej niz dobe, ale pisaly w ciagu 7 dni
+async function loadSeen(){
+  I.seenT=Date.now();
+  try{
+    const rows=parseLines(await(await api('query',{query:'_time:7d '+EXCL+' | stats by (host, source, unit) max(_time) t'})).text());
+    I.seen=new Map(rows.filter(o=>o.host).map(o=>[key(o),{f:{host:o.host,source:o.source,unit:o.unit},t:Date.parse(o.t)||0}]));build();paint();
+  }catch{}
+}
+// norma bledow kazdego zrodla z 7 dni (godzinowo)
+async function loadBase(){
+  I.baseT=Date.now();
+  try{I.base=baseOf(await hits(ERR+' '+EXCL,Date.now()-7*24*H,H,F));I.baseOk=true;build();paint()}catch{}
+}
+async function loadNews(){
+  I.newsT=Date.now();
+  try{const now=Date.now();I.news=await patterns(now-24*H,now);build();paint()}catch{}
+}
+
+// ------------------------------------------------------------- zdarzenia
+// norma zrodla: 75. percentyl bledow na godzine; staly szum: bledy w co najmniej polowie godzin
+function baseOf(series){
+  const m=new Map();
+  for(const h of series){
+    if(!h.f.host)continue;
+    const v=h.v.slice(0,-1),s=v.slice().sort((a,b)=>a-b),nz=v.filter(x=>x>0).length;
+    m.set(key(h.f),{p75:s[Math.floor(s.length*.75)]||0,chronic:v.length>=23&&nz/v.length>=.5,rate:sum(v)/Math.max(1,v.length)});
+  }
+  return m;
+}
+const thrOf=b=>Math.max(5,Math.ceil(4*(b?b.p75:0)));
+// rodzaje bledow (liczby zwiniete do <N>), ktore pierwszy raz pojawily sie w [from, to]; porownanie z 14 dniami wczesniej
+async function patterns(from,to){
+  const q=ERR+' '+EXCL+' | collapse_nums | stats by (host, source, unit, _msg) min(_time) first, count() c | sort by (first desc) | limit 400';
+  const rows=parseLines(await(await api('query',{query:q,start:iso(from-14*24*H),end:iso(to)})).text());
+  return rows.filter(o=>o.host&&o.source!=='stat'&&o.source!=='crondef').map(o=>({f:{host:o.host,source:o.source,unit:o.unit},k:key(o),msg:o._msg||'',first:Date.parse(o.first),c:+o.c||0})).filter(p=>p.first>=from);
+}
+function incidentsFrom(series,base,from,news){
+  const out=[],by=new Map(),push=c=>{out.push(c);(by.get(c.k)||by.set(c.k,[]).get(c.k)).push(c)};
+  for(const h of series){
+    if(!h.f.host)continue;
+    const k=key(h.f),b=base.get(k),thr=thrOf(b);let c=null;
+    h.v.forEach((x,i)=>{
+      const t=h.t0+i*H;if(t+H<=from||x<thr)return;
+      if(c&&t-c.to<=H){c.to=t+H;c.lines+=x;c.peak=Math.max(c.peak,x)}
+      else{c={f:h.f,k,from:t,to:t+H,lines:x,peak:x,norm:b?b.p75:0,spike:true,news:[]};push(c)}
+    });
+  }
+  // nowe rodzaje bledow: doklejone do skoku tego samego zrodla albo jako osobne zdarzenie
+  const nk=new Map();for(const p of news||[])(nk.get(p.k)||nk.set(p.k,[]).get(p.k)).push(p);
+  for(const [k,ps] of nk){
+    ps.sort((a,b)=>a.first-b.first);
+    if(ps.length>12){ // wiele naraz: nowe zrodlo albo duza zmiana - jedno zdarzenie
+      push({f:ps[0].f,k,from:Math.floor(ps[0].first/H)*H,to:Math.floor(ps[ps.length-1].first/H)*H+H,lines:sum(ps.map(p=>p.c)),peak:0,spike:false,many:true,news:ps.slice().sort((a,b)=>b.c-a.c)});
+      continue;
+    }
+    for(const p of ps){
+      let c=(by.get(k)||[]).find(x=>!x.many&&p.first>=x.from-H&&p.first<x.to+H);
+      if(!c){const hb=Math.floor(p.first/H)*H;c={f:p.f,k,from:hb,to:hb+H,lines:0,peak:0,spike:false,news:[]};push(c)}
+      c.news.push(p);if(!c.spike)c.lines+=p.c;
+    }
+  }
+  return out.sort((a,b)=>b.from-a.from);
 }
 
 // ------------------------------------------------------------ stan i zasoby
@@ -609,7 +728,7 @@ function item(label,sel,meta,u){
   const it=el('div','it');it.dataset.sel=sel;it.dataset.k=meta.k;it.tabIndex=0;it.setAttribute('role','button');
   if(u){const d=el('i',dotc(u.st));if(!u.st)d.style.visibility='hidden';d.title=u.stt;it.append(d)}
   const n=el('span','',label);n.title=meta.title||label;it.append(n);
-  if(u&&u.e24){const c=el('span','chip bad',num(u.e24));c.title='błędy w 24 h';it.append(c)}
+  if(u&&u.inc){const c=el('span','chip bad',u.inc);c.title=u.inc+' '+pl(u.inc,'zdarzenie','zdarzenia','zdarzeń')+' w 24 h';it.append(c)}
   if(u)it.append(el('small','',num(u.c24)));
   if(cur&&cur.sel===sel)it.classList.add('on');
   it.onclick=()=>pick(sel,meta);
@@ -667,7 +786,7 @@ function renderTree(){
   linkParents();
   tree.textContent='';
   for(const h of [...D.hosts.values()].filter(h=>!h.parent).sort((a,b)=>a.name.localeCompare(b.name)))tree.append(hostNode(h,open,first));
-  const e=sum(D.units.map(u=>u.e24));$('#nerr').hidden=!e;$('#nerr').textContent=num(e);
+  const e=(D.inc||[]).filter(vis).length;$('#nerr').hidden=!e;$('#nerr').textContent=e;$('#nerr').title=e+' '+pl(e,'zdarzenie','zdarzenia','zdarzeń')+' w 24 h';
   filterTree();marks();
 }
 function filterTree(){
@@ -684,13 +803,15 @@ function show(v){view=v;$('#over').hidden=v!=='over';$('#logs').hidden=v!=='logs
 
 // -------------------------------------------------------------------- przeglad
 function renderOver(light){
-  const hs=[...D.hosts.values()],us=D.units,upH=hs.filter(h=>h.up).length,bad=us.filter(u=>u.st==='bad').length,e=sum(us.map(u=>u.e24)),w=sum(us.map(u=>u.w24));
+  const hs=[...D.hosts.values()],us=D.units,upH=hs.filter(h=>h.up).length,bad=us.filter(u=>u.st==='bad').length,inc=(D.inc||[]).filter(vis),nn=sum(inc.map(x=>x.news.length));
   const tiles=$('#tiles');tiles.textContent='';
-  for(const [v,l,c] of [[num(sum(us.map(u=>u.c24))),'linii w 24 h',''],[num(e),'błędów',e?'e':''],[num(w),'ostrzeżeń',w?'w':''],[upH+' / '+hs.length,'serwerów online',upH<hs.length?'w':'g'],[bad,'usług z problemem',bad?'e':'g']]){
-    const d=el('div',c);d.append(el('b','',v),el('span','mut',l));tiles.append(d);
+  for(const [v,l,c,go] of [[num(sum(us.map(u=>u.c24))),'linii w 24 h',''],[inc.length,pl(inc.length,'zdarzenie','zdarzenia','zdarzeń')+' w 24 h',inc.length?'e':'g',1],[nn,pl(nn,'nowy rodzaj','nowe rodzaje','nowych rodzajów')+' błędów',nn?'w':'',1],[upH+' / '+hs.length,'serwerów online',upH<hs.length?'w':'g'],[bad,'usług z problemem',bad?'e':'g']]){
+    const d=el('div',c+(go?' go':''));d.append(el('b','',v),el('span','mut',l));
+    if(go){d.title='pokaż zdarzenia';d.onclick=()=>openInc('')}
+    tiles.append(d);
   }
   const cards=$('#cards');cards.textContent='';
-  for(const h of hs.sort((a,b)=>a.up-b.up||b.bad.length-a.bad.length||b.e24-a.e24||a.name.localeCompare(b.name))){
+  for(const h of hs.sort((a,b)=>a.up-b.up||b.bad.length-a.bad.length||b.inc-a.inc||a.name.localeCompare(b.name))){
     const c=el('div','card'+(h.up?'':' off')),hd=el('header');
     hd.append(el('i','dot'+(h.up?(h.bad.length?' bad':' up'):'')),el('b','',h.name),el('span','chip '+(!h.up?'wrn':h.bad.length?'bad':'ok'),!h.up?'milczy: '+rel(h.last):h.bad.length?h.bad.length+' z problemem':'online'));
     const s=D.stat.get(h.name),res=[];
@@ -738,31 +859,33 @@ function renderOver(light){
     const sp=el('div','sp');spark(sp,h.v,h.ev,H);
     const types=el('div','mut',[...new Set(h.units.map(u=>u.source))].sort().map(s=>h.units.filter(u=>u.source===s).length+' '+(SRC[s]||s)).join(' · '));
     const kv=el('div','kv');
-    for(const [v,l,k] of [[num(h.c24),'linie',''],[num(h.e24),'błędy',h.e24?'e':''],[num(h.w24),'ostrzeżenia',h.w24?'w':''],[relS(h.last),'ostatni log','']]){
+    for(const [v,l,k] of [[num(h.c24),'linie',''],[h.inc,pl(h.inc,'zdarzenie','zdarzenia','zdarzeń'),h.inc?'e':''],[h.nnew,'nowe błędy',h.nnew?'w':''],[relS(h.last),'ostatni log','']]){
       const d=el('div');d.append(el('b',k,v),el('span','mut',l));kv.append(d);
     }
-    const ft=el('footer'),b1=el('button','','Logi'),b2=el('button','','Błędy');
+    const ft=el('footer'),b1=el('button','','Logi'),b2=el('button','','Zdarzenia');
     const meta={title:h.name,host:h.name,multi:true};
     b1.onclick=()=>pick('{host='+quote(h.name)+'}',meta,'');
-    b2.onclick=()=>pick('{host='+quote(h.name)+'}',meta,'e','1d');b2.disabled=!h.e24;
+    b2.onclick=()=>openInc(h.name);b2.disabled=!h.inc;
     ft.append(b1,b2);c.append(hd,...res,r,sp,types,kv,ft);cards.append(c);
   }
   renderUnits();renderRes();renderDisks();renderPorts();
   const lt=Math.max(0,...[...D.stat.values()].map(s=>s.t));
   $('#osub').textContent='Stan serwerów i logi z ostatnich 24 godzin.'+(lt?' Zasoby odświeżane na bieżąco, ostatni pomiar '+rel(lt)+'.':'');
-  if(tab==='errs'&&!light)loadErrs();
+  if(tab==='errs'&&!light)loadInc();
 }
 function renderUnits(){
   const t=$('#us').value.trim().toLowerCase(),by=$('#usort').value,dir=+$('#udir').value,tbl=$('#tbl');
   const us=D.units.filter(u=>!t||(u.host+' '+u.unit).toLowerCase().includes(t)).sort((a,b)=>(by==='unit'?a.unit.localeCompare(b.unit):a[by]-b[by])*dir||a.unit.localeCompare(b.unit));
   const max=Math.max(1,...us.map(u=>u.c24));
   tbl.textContent='';
-  const hd=el('div','tr h');for(const x of ['Źródło','Serwer','Typ','Linie 24 h','Błędy','Ostrz.','Ostatni log'])hd.append(el('span','',x));tbl.append(hd);
+  const hd=el('div','tr h');for(const x of ['Źródło','Serwer','Typ','Linie 24 h','Zdarzenia','Błędy zwykle','Ostatni log'])hd.append(el('span','',x));tbl.append(hd);
   for(const u of us){
     const r=el('div','tr'),n=el('span'),dt=el('i',dotc(u.st));if(!u.st)dt.style.visibility='hidden';dt.title=u.stt;n.append(dt,el('span','',short(u.unit)));n.title=u.unit;
     const vol=el('span','vol'),bar=el('i');bar.style.width=Math.round(u.c24/max*100)+'%';vol.append(el('span','',num(u.c24)),bar);
-    const e=el('span');if(u.e24)e.append(el('span','chip bad',num(u.e24)));else e.textContent='–';
-    const w=el('span');if(u.w24)w.append(el('span','chip wrn',num(u.w24)));else w.textContent='–';
+    const e=el('span');if(u.inc){const c=el('span','chip bad',u.inc);c.title=num(u.e24)+' linii z błędami w 24 h';e.append(c)}else e.textContent='–';
+    const w=el('span','mut'),nm=u.norm;
+    if(nm&&nm.chronic){const c=el('span','chip wrn',MUTE.has(u.k)?'wyciszone':'stały szum');c.title='średnio ~'+rate(nm.rate)+' błędów na godzinę';w.append(c)}
+    else w.textContent=nm&&nm.rate>=.05?'~'+rate(nm.rate)+'/h':'–';
     r.append(n,el('span','',u.host),el('span','mut',SRC[u.source]||u.source),vol,e,w,el('span','mut',rel(u.last)));
     r.tabIndex=0;r.onclick=()=>pick(u.sel,{title:short(u.unit),host:u.host,source:u.source,unit:u.unit},'');
     r.onkeydown=x=>{if(x.key==='Enter')r.onclick()};
@@ -770,20 +893,116 @@ function renderUnits(){
   }
   if(!us.length)tbl.append(el('div','n','Żadne źródło nie pasuje do wyszukiwania.'));
 }
-async function loadErrs(){
-  const box=$('#errs');
+const rate=x=>x>=10?num(Math.round(x)):dec(x);
+const WD=['niedz.','pon.','wt.','śr.','czw.','pt.','sob.'];
+const dlab=d=>WD[d.getDay()]+' '+pad(d.getDate())+'.'+pad(d.getMonth()+1);
+function winLabel(a,b){
+  const A=new Date(a),B=new Date(b),t=d=>pad(d.getHours())+':'+pad(d.getMinutes());
+  if(A.toDateString()===new Date(b-1).toDateString())return dlab(A)+', '+t(A)+'–'+(t(B)==='00:00'?'24:00':t(B));
+  return dlab(A)+' '+t(A)+' – '+dlab(B)+' '+t(B);
+}
+let IR={k:'',t:0,list:[],base:new Map(),days:1,day:null};
+function openInc(host){
+  if(view!=='over')show('over');
+  $('#ir').value='1d';IR.day=null;fillHosts();$('#ih').value=host||'';
+  document.querySelector('#tabs button[data-tab=errs]').click();
+}
+function fillHosts(){
+  const ih=$('#ih'),cv=ih.value;ih.textContent='';ih.append(new Option('wszystkie serwery',''));
+  for(const n of [...D.hosts.keys()].sort())ih.append(new Option(n+(kids(n).length?' (z kontenerami)':''),n));
+  ih.value=D.hosts.has(cv)?cv:'';
+}
+async function loadInc(){
+  fillHosts();
+  const r=$('#ir').value,days={'1d':1,'7d':7,'30d':30,'90d':90}[r]||1,now=Date.now();
+  if(days===1){IR={k:r,t:now,list:D.inc||[],base:D.base||new Map(),days:1,day:IR.k===r?IR.day:null};$('#imsg').textContent='';return renderInc()}
+  if(IR.k===r&&now-IR.t<5*6e4)return renderInc();
+  $('#imsg').textContent='Liczę zdarzenia z '+days+' dni…';
   try{
-    const rows=parseLines(await(await api('query',{query:ERR+' _time:1d',limit:50})).text()).sort((a,b)=>a._time<b._time?1:-1);
-    box.textContent='';
-    for(const o of rows){const r=row(o,true);r.onclick=()=>pick(selOf(o),{title:short(o.unit),host:o.host,source:o.source,unit:o.unit},'');box.append(r)}
-    if(!rows.length)box.append(el('div','n','Brak błędów w ostatnich 24 godzinach.'));
-  }catch(e){box.textContent='';box.append(el('div','n','Nie udało się wczytać błędów: '+e.message))}
+    const from=now-days*24*H,series=await hits(ERR+' '+EXCL,from-7*24*H,H,F),base=baseOf(series);
+    const news=await patterns(from,now).catch(()=>[]);
+    if($('#ir').value!==r)return;
+    IR={k:r,t:now,list:incidentsFrom(series,base,from,news),base,days,day:null};$('#imsg').textContent='';
+  }catch(e){$('#imsg').textContent='Nie udało się policzyć zdarzeń: '+e.message;return}
+  renderInc();
+}
+function renderInc(){
+  const hf=$('#ih').value,fam=hf?family(hf):null,L=IR.list.filter(x=>vis(x)&&(!fam||fam.includes(x.f.host)));
+  // pasek: godziny (24 h) albo dni; kolor zalezy od liczby zdarzen
+  const box=$('#idays'),hourly=IR.days===1,starts=[];box.textContent='';
+  if(hourly){const e=Math.floor(Date.now()/H)*H;for(let i=23;i>=0;i--)starts.push(e-i*H)}
+  else{const d=new Date();d.setHours(0,0,0,0);for(let i=IR.days-1;i>=0;i--){const x=new Date(d);x.setDate(d.getDate()-i);starts.push(+x)}}
+  const ends=starts.map((x,i)=>i+1<starts.length?starts[i+1]:x+(hourly?H:24*H));
+  const cnt=starts.map((x,i)=>L.filter(y=>y.from<ends[i]&&y.to>x).length),mx=Math.max(1,...cnt);
+  starts.forEach((x,i)=>{
+    const c=cnt[i],b=el('button',c?'l'+(c/mx>.66?3:c/mx>.33?2:1):''),d=new Date(x);
+    b.append(el('b','',c||''),el('span','',hourly?pad(d.getHours()):IR.days>31?d.getDate():d.getDate()+'.'+pad(d.getMonth()+1)));
+    b.title=(hourly?pad(d.getHours())+':00–'+pad(new Date(ends[i]).getHours())+':00':d.toLocaleDateString('pl-PL',{weekday:'long',day:'numeric',month:'long'}))+' · '+(c?c+' '+pl(c,'zdarzenie','zdarzenia','zdarzeń'):'spokój');
+    if(IR.day&&IR.day[0]===x)b.classList.add('on');
+    b.onclick=()=>{IR.day=IR.day&&IR.day[0]===x?null:[x,ends[i]];renderInc()};
+    box.append(b);
+  });
+  const sel=IR.day?L.filter(x=>x.from<IR.day[1]&&x.to>IR.day[0]):L,lb=$('#ilist');lb.textContent='';
+  const head=el('div','inc');head.style.gridTemplateColumns='1fr auto';
+  head.append(el('span','lbl',(IR.day?(hourly?'Godzina '+pad(new Date(IR.day[0]).getHours())+':00':new Date(IR.day[0]).toLocaleDateString('pl-PL',{weekday:'long',day:'numeric',month:'long'})):'Cały okres')+' · '+sel.length+' '+pl(sel.length,'zdarzenie','zdarzenia','zdarzeń')));
+  if(IR.day){const b=el('button','','pokaż cały okres');b.onclick=()=>{IR.day=null;renderInc()};head.append(b)}
+  lb.append(head);
+  for(const x of sel.slice(0,300))lb.append(incRow(x));
+  if(!sel.length)lb.append(el('div','n',IR.day?'W tym czasie nic się nie działo.':'Brak zdarzeń w tym okresie: żadnych skoków ponad normę ani nowych rodzajów błędów.'));
+  if(sel.length>300)lb.append(el('div','n','Pokazano 300 najnowszych. Wybierz dzień na pasku, żeby zobaczyć resztę.'));
+  renderNoise(fam);
+}
+function incRow(x){
+  const r=el('div','inc'),wh=el('div','what'),act=el('div','act');
+  const nm=el('b','',x.f.host+' › '+short(x.f.unit));nm.title=x.f.host+' · '+x.f.unit;
+  wh.append(nm,el('span','mut',SRC[x.f.source]||x.f.source));
+  if(x.spike){const c=el('span','chip bad','skok: '+num(x.lines)+' linii z błędami');c.title='w szczycie '+num(x.peak)+' na godzinę, zwykle do ~'+num(x.norm)+' na godzinę';wh.append(c)}
+  if(x.many)wh.append(el('span','chip wrn',x.news.length+' nowych rodzajów błędów naraz'));
+  else if(x.news.length){const n=x.news.length;wh.append(el('span','chip wrn',n===1?'nowy błąd':n+' '+pl(n,'','nowe błędy','nowych błędów')))}
+  const bl=el('button','','Logi');bl.title='błędy z tego źródła w tym oknie czasu';
+  bl.onclick=()=>pick(selOf(x.f),{title:short(x.f.unit),host:x.f.host,source:x.f.source,unit:x.f.unit},'e',null,[x.from,x.to]);
+  act.append(bl);r.append(el('div','when',winLabel(x.from,x.to)),wh,act);
+  const ms=el('div','msgs');
+  for(const p of x.news.slice(0,3)){const d=el('div','',p.msg);d.title=p.msg+'\npierwszy raz: '+fmt(new Date(p.first))+' · razem '+p.c+'×';ms.append(d)}
+  if(x.news.length>3)ms.append(el('div','','… i '+(x.news.length-3)+' innych'));
+  if(x.spike&&!x.news.length){
+    const b=el('button','','najczęstsze komunikaty');
+    b.onclick=async()=>{
+      b.disabled=true;b.textContent='Wczytuję…';
+      try{
+        const rows=parseLines(await(await api('query',{query:selOf(x.f)+' '+ERR+' | collapse_nums | stats by (_msg) count() c | sort by (c desc) | limit 3',start:iso(x.from),end:iso(x.to)})).text());
+        b.remove();for(const o of rows){const d=el('div','',(+o.c>1?num(+o.c)+'× ':'')+(o._msg||''));d.title=o._msg||'';ms.append(d)}
+        if(!rows.length)ms.append(el('div','','brak'));
+      }catch(e){b.disabled=false;b.textContent='Nie udało się, spróbuj ponownie'}
+    };
+    ms.append(b);
+  }
+  if(ms.children.length)r.append(ms);
+  return r;
+}
+// staly szum: zrodla sypiace bledami prawie bez przerwy; mozna je wyciszyc (zapamietane w tej przegladarce)
+function renderNoise(fam){
+  const box=$('#inoise');box.textContent='';
+  const rows=[...IR.base.entries()].filter(([k,b])=>b.chronic||MUTE.has(k)).map(([k,b])=>{const [host,source,unit]=k.split('\n');return {k,b,f:{host,source,unit}}}).filter(x=>!fam||fam.includes(x.f.host));
+  if(!rows.length)return;
+  box.append(el('div','lbl','Stały szum'),el('div','mut','Te źródła sypią błędami prawie bez przerwy. Ich zwykły poziom nie jest zdarzeniem; zdarzeniem jest dopiero wyraźny skok ponad normę albo nowy rodzaj błędu. Wyciszone nie pokazują żadnych zdarzeń. Wyciszenie zapamiętuje ta przeglądarka.'));
+  const t=el('div','ilist');
+  for(const x of rows.sort((a,b)=>b.b.rate-a.b.rate)){
+    const r=el('div','inc'),m=MUTE.has(x.k),wh=el('div','what'),nm=el('b','',x.f.host+' › '+short(x.f.unit));nm.title=x.f.unit;
+    wh.append(nm,el('span','mut',SRC[x.f.source]||x.f.source));if(m)wh.append(el('span','chip','wyciszone'));
+    const b=el('button','',m?'Przywróć':'Wycisz');
+    b.onclick=()=>{if(m)MUTE.delete(x.k);else MUTE.add(x.k);saveMute();build();paint();renderInc()};
+    const act=el('div','act');act.append(b);
+    r.append(el('div','when','~'+rate(x.b.rate)+' błędów / godz.'),wh,act);t.append(r);
+  }
+  box.append(t);
 }
 for(const b of document.querySelectorAll('#tabs button'))b.onclick=()=>{
   tab=b.dataset.tab;for(const x of document.querySelectorAll('#tabs button'))x.classList.toggle('on',x===b);
   $('#cards').hidden=tab!=='hosts';$('#units').hidden=tab!=='units';$('#errs').hidden=tab!=='errs';$('#resv').hidden=tab!=='res';$('#diskv').hidden=tab!=='disks';$('#portv').hidden=tab!=='ports';
-  if(tab==='errs')loadErrs();
+  if(tab==='errs')loadInc();
 };
+$('#ir').onchange=()=>{IR.day=null;loadInc()};$('#ih').onchange=renderInc;
 $('#us').oninput=$('#usort').onchange=$('#udir').onchange=renderUnits;
 
 // stan dysku z SMART: [stan, opis]
@@ -1029,8 +1248,10 @@ $('#ntest').onclick=async()=>{
 async function loadCron(){
   const jobs=new Map(),jk=(h,u)=>h+'\n'+u;
   for(const u of D.units.filter(u=>u.source==='cron'))jobs.set(jk(u.host,u.unit),{host:u.host,unit:u.unit,sel:u.sel,c24:u.c24,e24:u.e24,runs:[],def:null});
+  I.cronT=Date.now();
   try{
-    const defs=parseLines(await(await api('query',{query:'{source="crondef"} _time:100d',limit:1000})).text()),scan={};
+    if(!I.defs||Date.now()-I.defsT>10*6e4){I.defs=parseLines(await(await api('query',{query:'{source="crondef"} _time:100d',limit:1000})).text());I.defsT=Date.now()}
+    const defs=I.defs,scan={};
     for(const d of defs)scan[d.host]=Math.max(scan[d.host]||0,+d.cron_scan||0);
     for(const d of defs){
       if((+d.cron_scan||0)!==scan[d.host])continue;
@@ -1038,7 +1259,17 @@ async function loadCron(){
       j.def=d;
     }
   }catch{}
-  await Promise.all([...jobs.values()].slice(0,80).map(async j=>{
+  // ostatnie uruchomienia wszystkich zadan jednym zapytaniem (po 20 na zadanie)
+  let runs=null;
+  try{runs=parseLines(await(await api('query',{query:'{source="cron"} _time:30d | sort by (_time desc) limit 20 partition by (host, unit)'})).text())}catch{}
+  if(runs){
+    for(const o of runs){
+      if(!o.host)continue;
+      const k=jk(o.host,o.unit),j=jobs.get(k)||jobs.set(k,{host:o.host,unit:o.unit,sel:selOf({host:o.host,source:'cron',unit:o.unit}),c24:0,e24:0,runs:[]}).get(k);
+      j.runs.push(o);
+    }
+    for(const j of jobs.values())j.runs=j.runs.sort((a,b)=>a._time<b._time?1:-1).slice(0,20);
+  }else await Promise.all([...jobs.values()].slice(0,80).map(async j=>{
     try{j.runs=parseLines(await(await api('query',{query:j.sel+' _time:30d',limit:20})).text()).sort((a,b)=>a._time<b._time?1:-1)}catch{}
   }));
   C=[...jobs.values()];window.C_ALL=C;
@@ -1080,7 +1311,7 @@ function cronPl(s){
   return out[0].toUpperCase()+out.slice(1);
 }
 const dur=s=>s==null||s===''?'':s<90?s+' s':s<5400?Math.round(s/60)+' min':dec(s/3600)+' godz.';
-function showCron(host){cronHost=host;renderCron();show('cron')}
+function showCron(host){cronHost=host;renderCron();show('cron');if(Date.now()-I.cronT>6e4)loadCron()}
 function renderCron(){
   const t=$('#cs').value.trim().toLowerCase(),f=$('#cf').value,tiles=$('#ctiles'),tbl=$('#ctbl');
   const fam=cronHost?family(cronHost):null,C=fam?window.C_ALL.filter(j=>fam.includes(j.host)):window.C_ALL;
@@ -1117,10 +1348,12 @@ function renderCron(){
 $('#cs').oninput=$('#cf').onchange=renderCron;
 
 // ------------------------------------------------------------------------ logi
-function pick(sel,meta,lvl,range){
-  cur={sel,meta};
+function pick(sel,meta,lvl,range,win){
+  cur={sel,meta,win:win||null};
   if(lvl!=null)$('#lvl').value=lvl;
-  if(range)$('#range').value=range;
+  const rs=$('#range');let wo=rs.querySelector('option[value=win]');
+  if(win){if(!wo){wo=new Option('','win');rs.append(wo)}wo.textContent=winLabel(win[0],win[1]);rs.value='win'}
+  else{if(wo){wo.remove();if(!range)rs.value='1h'}if(range)rs.value=range}
   const t=$('#title');t.textContent='';
   const us=matching(),hh=meta.host?D.hosts.get(meta.host):null,st=meta.unit?(us[0]&&us[0].st):hh?(hh.up?(hh.bad.length?'bad':'up'):null):null;
   t.append(el('i',dotc(st)),el('b','',meta.title));
@@ -1140,7 +1373,7 @@ function resBox(){
 }
 async function headStats(){
   if(!cur)return;
-  const e=sum(matching().map(u=>u.e24)),eb=$('#e24');eb.textContent=num(e);eb.style.color=e?'var(--err)':'';
+  const e=sum(matching().map(u=>u.inc||0)),eb=$('#e24');eb.textContent=e;eb.style.color=e?'var(--err)':'';eb.title=num(sum(matching().map(u=>u.e24)))+' linii z błędami w 24 h';
   resBox();
   try{
     const sel=cur.sel,h=await hits(sel+' '+EXCL,Date.now()-60*6e4,6e4);
@@ -1195,16 +1428,18 @@ async function reload(){
   ctl=new AbortController();const signal=ctl.signal;
   log.textContent='';seen=new Set();fresh=0;jump.hidden=true;pos.hidden=true;$('#cnt').textContent='';marks();
   word=$('#q').value.trim();
-  const lv=$('#lvl').value;
+  const lv=$('#lvl').value,rv=$('#range').value;
+  if(rv!=='win'&&cur.win){cur.win=null;const wo=$('#range option[value=win]');if(wo)wo.remove()}
+  const win=cur.win;
   const q=cur.sel+' '+EXCL+(lv==='e'?' '+ERR:lv==='w'?' ('+ERR+' OR '+WARN+')':'')+(word?' ~'+quote('(?i)'+word.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')):'');
   try{
     status('Wczytuję…');
-    const txt=await(await api('query',{query:q+' _time:'+$('#range').value,limit:LIMIT},signal)).text();
+    const txt=await(await api('query',win?{query:q,start:iso(win[0]),end:iso(win[1]),limit:LIMIT}:{query:q+' _time:'+rv,limit:LIMIT},signal)).text();
     const rows=parseLines(txt).sort((a,b)=>a._time<b._time?-1:a._time>b._time?1:0);
-    if(!rows.length)log.append(el('div','n','Brak logów w wybranym zakresie.'+(live?' Nowe linie pojawią się tutaj same.':'')));
+    if(!rows.length)log.append(el('div','n','Brak logów w wybranym zakresie.'+(live&&!win?' Nowe linie pojawią się tutaj same.':'')));
     append(rows,true);
     status(rows.length>=LIMIT?'Pokazano '+LIMIT+' najnowszych linii z zakresu. Zawęź wyszukiwanie, żeby zobaczyć starsze.':'');
-    if(live)await tail(q,signal);
+    if(live&&!win)await tail(q,signal);
   }catch(e){if(e.name!=='AbortError'&&me)status('Błąd: '+e.message)}
 }
 async function tail(q,signal){
@@ -1235,7 +1470,7 @@ log.onscroll=()=>{
 // ------------------------------------------------------------------ sterowanie
 for(const b of document.querySelectorAll('#nav button'))b.onclick=()=>{
   const g=b.dataset.go;
-  if(g==='cron'){cronHost=null;renderCron();return show(g)}
+  if(g==='cron'){cronHost=null;renderCron();show(g);if(Date.now()-I.cronT>6e4)loadCron();return}
   if(g==='over'||g==='notif'||g==='users')return show(g);
   pick(ALL,{title:g==='err'?'Błędy i ostrzeżenia':'Wszystkie logi',multi:true},g==='err'?'w':'',g==='err'?'1d':null);
 };
