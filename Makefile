@@ -1,12 +1,12 @@
 # loghub: polecenia dla rozwoju (weryfikacja, formatowanie, podglad strony).
 #
-#   make check     - weryfikacja przed commitem: bash -n, shellcheck, py_compile, black, prettier
+#   make check     - weryfikacja przed commitem: bash -n, shellcheck, py_compile, black, node --check, prettier
 #   make check-info - wyniki info shellcheck (nieblokujace; poziom gate to warning)
 #   make format   - formatowanie: prettier (hub/www) i black (hub/auth, hub/notify)
 #   make preview  - strona na przykladowych danych: http://localhost:8765/?demo
 #
 # Piny narzedzi sa tu prawda (CI je uzywa); lokalnie miec te same wersje:
-#   prettier 3.6.2, black 26.10.1, shellcheck 0.11.0
+#   prettier 3.6.2, black 26.10.1, shellcheck 0.11.0; node (dowolny nowoczesny, tylko node --check)
 
 SHELL := /bin/bash
 PY := python3
@@ -27,6 +27,8 @@ check: ## weryfikacja przed commitem (musi byc zielona lokalnie)
 	shellcheck -S warning $(SHELL_SCRIPTS)
 	$(PY) -m py_compile hub/auth/*.py hub/notify/*.py
 	$(PY) -m black --check -l 120 hub/auth hub/notify
+	@command -v node >/dev/null 2>&1 || { echo "BLAD: brak node (potrzebny do node --check skryptow www)"; exit 1; }
+	@for f in hub/www/js/*.js hub/www/demo.js; do node --check "$$f" || { echo "BLAD: node --check $$f"; exit 1; }; done
 	$(PRETTIER) --check hub/www
 
 check-info: ## wyniki info shellcheck (widocznosc w logu CI; nieblokujace, poziom gate to warning)

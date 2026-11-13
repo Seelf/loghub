@@ -46,6 +46,18 @@ const RULES = [
     ],
   ],
 ];
+// krótkie nazwy typow alertow (klucze jak w RULES) do filtrowania per kanal
+const KINDS = {
+  host_offline: 'Serwer offline',
+  service_down: 'Padły kontener lub usługa',
+  cron_failed: 'Błąd zadania cron',
+  disk: 'Dysk pełny',
+  disk_health: 'Awaria dysku (SMART/ZFS)',
+  ports: 'Port otwarty na świat',
+  cpu: 'Wysokie CPU',
+  mem: 'Wysoki RAM',
+  errors: 'Wysyp błędów w logach',
+};
 const CHT = {
   ntfy: [
     'ntfy',
@@ -218,6 +230,39 @@ function renderNset() {
       l.append(i);
       w.append(l);
     }
+    // co ten kanal dostaje: puste = wszystkie typy; wiadomosc testowa idzie zawsze na wlaczone kanaly
+    const kt = el('div', 'kinds'),
+      kq = el('span', 'kq'),
+      allb = el('button', 'mini', 'wszystkie'),
+      nob = el('button', 'mini', 'żadne');
+    allb.onclick = () => {
+      c.types = RULES.map(x => x[0]);
+      ndirty = true;
+      renderNset();
+    };
+    nob.onclick = () => {
+      c.types = [];
+      ndirty = true;
+      renderNset();
+    };
+    kq.append(allb, nob);
+    kt.append(el('b', '', 'Co tu wysyłać'), kq);
+    const kg = el('div', 'kgrid');
+    for (const [k] of RULES) {
+      const l = el('label', 'knd'),
+        cb = el('input');
+      cb.type = 'checkbox';
+      cb.dataset.k = k;
+      cb.checked = (c.types || []).includes(k);
+      cb.onchange = () => {
+        c.types = [...kg.querySelectorAll('input')].filter(x => x.checked).map(x => x.dataset.k);
+        ndirty = true;
+      };
+      l.append(cb, el('span', '', KINDS[k]));
+      kg.append(l);
+    }
+    kt.append(kg, el('small', '', 'bez zaznaczenia = wszystkie typy'));
+    w.append(kt);
     chs.append(w);
   });
   if (!NC.channels.length)

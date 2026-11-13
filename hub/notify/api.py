@@ -48,6 +48,9 @@ def clean_config(new, old):
         for f in CHANNEL_FIELDS[t]:
             v = str(ch.get(f) or "").strip()[:500]
             c[f] = prev.get(f, "") if v == MASK else v
+        # typy alertow, ktore ten kanal dostaje; pusta lista = wszystkie (kompatybilne ze starymi instalacjami)
+        ts = ch.get("types")
+        c["types"] = list(dict.fromkeys(k for k in (ts if isinstance(ts, list) else []) if k in out["rules"]))
         for f in {
             "ntfy": ["url"],
             "telegram": ["bot_token", "chat_id"],

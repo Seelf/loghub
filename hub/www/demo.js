@@ -752,7 +752,15 @@
     notify_resolved: true,
     repeat_hours: 0,
     channels: [
-      { id: 'demo1', type: 'ntfy', on: true, name: 'telefon', url: 'https://ntfy.sh/moj-loghub', token: '' },
+      {
+        id: 'demo1',
+        type: 'ntfy',
+        on: true,
+        name: 'telefon',
+        url: 'https://ntfy.sh/moj-loghub',
+        token: '',
+        types: ['service_down', 'cron_failed', 'disk_health'],
+      },
     ],
   };
 

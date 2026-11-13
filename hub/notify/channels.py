@@ -1,4 +1,7 @@
-"""Wysylka powiadomien: ntfy, Telegram, Discord, webhook, e-mail."""
+"""Wysylka powiadomien: ntfy, Telegram, Discord, webhook, e-mail.
+
+Kazdy kanal moze dostawac tylko wybrane typy alertow (pole 'types'; puste = wszystkie),
+wiadomosc testowa idzie na wszystkie wlaczone kanaly."""
 
 import json
 import smtplib
@@ -75,10 +78,16 @@ def send_channel(ch, what, a):
         raise ValueError("nieznany kanał: %s" % t)
 
 
+def channel_allows(ch, what, a):
+    """Czy kanal dostaje dany alert: puste 'types' = wszystko; wiadomosc testowa idzie na wszystkie wlaczone."""
+    kinds = ch.get("types") or []
+    return what == "test" or not kinds or a.get("kind") in kinds
+
+
 def deliver(cfg, what, a):
     res = []
     for ch in cfg.get("channels", []):
-        if not ch.get("on", True):
+        if not ch.get("on", True) or not channel_allows(ch, what, a):
             continue
         name = ch.get("name") or ch.get("type")
         try:
