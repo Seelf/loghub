@@ -57,8 +57,9 @@ Formatowanie: `make format` (prettier dla `hub/www` wg `.prettierrc`, black -l 1
 - Piny narzedzi (Makefile, CI): prettier 3.6.2, black 26.10.1, shellcheck 0.11.0 - to one sa prawda.
 - CI uruchamia shellcheck na poziomie `warning`; wyniki `info` (SC2015, SC2153, SC1003) sa znane i
   celowo nieblokujace. Nie podnosic poziomu bez najpierw porzadkowania wszystkich wyników info.
-- Zmienne w `lib/*.sh` sa uzywane miedzy plikami source'owanymi razem przez install.sh -
-  `shellcheck disable=SC2034` na glowie tych plikow jest celowe.
+- Zmienne w `lib/*.sh` sa uzywane miedzy plikami source'owanymi razem przez install.sh, wiec
+  `shellcheck disable=SC2034` na glowie tych plikow jest celowe. Nie przenosic tych disable na inne
+  pliki: prawdziwie martwa zmienna do usuniecia, nie do maskowania.
 
 ## Inwarianty bezpieczenstwa (nie lamac)
 

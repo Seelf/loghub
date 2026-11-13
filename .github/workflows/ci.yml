@@ -8,25 +8,35 @@ on:
 
 jobs:
   check:
-    # piny obrazu i akcji: CI ma byc odtwarzalny (przeniesienie na nowszy Ubuntu/wersje akcji jest swiadoma decyzja)
+    # Obraz i akcje sa piny (SHA akcji = konkretna wersja; porownywany jest tez sha256 pobieranego
+    # binary shellcheck). Aktualizacja pinu jest swiadoma decyzja: najpierw make check lokalnie.
+    # Uwaga: piny obrazu tez sie starzeja (github.com/actions/runner-images/issues/14748) - przy
+    # migracji ubuntu-24.04 -> nowszy obraz przejsc make check i zostawic te tresc w komentarzu.
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v7
+      # actions/checkout v7.0.1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
 
-      # piny narzedzi wg Makefile (one sa prawda): shellcheck 0.11.0
+      # piny narzedzi wg Makefile (one sa prawda): shellcheck 0.11.0 + weryfikacja sha256 binary
       - name: shellcheck 0.11.0
         run: |
           curl -sSL -o sc.tar.xz https://github.com/koalaman/shellcheck/releases/download/v0.11.0/shellcheck-v0.11.0.linux.x86_64.tar.xz
           tar xJf sc.tar.xz
+          echo "4da528ddb3a4d1b7b24a59d4e16eb2f5fd960f4bd9a3708a15baddbdf1d5a55b  shellcheck-v0.11.0/shellcheck" | sha256sum -c -
           sudo install -m 755 shellcheck-v0.11.0/shellcheck /usr/local/bin/shellcheck
 
       # piny narzedzi wg Makefile (one sa prawda): python 3.13, black 26.10.1, node 22 (prettier 3.6.2 przez npx)
-      - uses: actions/setup-python@v7
+      # actions/setup-python v7.1.0
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0
         with:
           python-version: "3.13"
       - run: pip install "black==26.10.1"
-      - uses: actions/setup-node@v7
+      # actions/setup-node v7.1.0
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
         with:
           node-version: "22"
 
       - run: make check
+
+      # wyniki info shellcheck: widoczne w logu, celowo nieblokujace (poziom gate: warning, patrz AGENTS.md)
+      - run: make check-info || true
