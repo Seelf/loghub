@@ -8,9 +8,10 @@ on:
 
 jobs:
   check:
-    runs-on: ubuntu-latest
+    # piny obrazu i akcji: CI ma byc odtwarzalny (przeniesienie na nowszy Ubuntu/wersje akcji jest swiadoma decyzja)
+    runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       # piny narzedzi wg Makefile (one sa prawda): shellcheck 0.11.0
       - name: shellcheck 0.11.0
@@ -20,11 +21,11 @@ jobs:
           sudo install -m 755 shellcheck-v0.11.0/shellcheck /usr/local/bin/shellcheck
 
       # piny narzedzi wg Makefile (one sa prawda): python 3.13, black 26.10.1, node 22 (prettier 3.6.2 przez npx)
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.13"
       - run: pip install "black==26.10.1"
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: "22"
 
