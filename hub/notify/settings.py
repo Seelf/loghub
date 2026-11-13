@@ -13,6 +13,8 @@ ERR = '(level:<=3 OR (level:"" (i(error) OR i(err) OR i(fatal) OR i(panic) OR i(
 SECRET_KEYS = ("token", "bot_token", "password")
 MASK = "••••••"
 
+# klucze rules to kanoniczna lista typow alertow; na niej baze:
+# walidacja typu kanalow (api.py clean_config) i sekcja "Co tu wysylac" strony (hub/www/js/notify.js, KINDS)
 DEFAULT = {
     "rules": {
         "host_offline": {"on": True, "minutes": 3},

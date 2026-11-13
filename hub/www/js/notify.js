@@ -46,7 +46,8 @@ const RULES = [
     ],
   ],
 ];
-// krótkie nazwy typow alertow (klucze jak w RULES) do filtrowania per kanal
+// krótkie nazwy typow alertow do filtrowania per kanal; klucze musza zgadzac sie z rules
+// w hub/notify/settings.py (waliduje je api.py clean_config; dodanie nowego typu wymaga zmiany w obu miejscach)
 const KINDS = {
   host_offline: 'Serwer offline',
   service_down: 'Padły kontener lub usługa',

@@ -49,8 +49,9 @@ def clean_config(new, old):
             v = str(ch.get(f) or "").strip()[:500]
             c[f] = prev.get(f, "") if v == MASK else v
         # typy alertow, ktore ten kanal dostaje; pusta lista = wszystkie (kompatybilne ze starymi instalacjami)
+        # walidacja wobec kanonicznej listy typow (klucze rules w settings.py), nie wobec ustawien uzytkownika
         ts = ch.get("types")
-        c["types"] = list(dict.fromkeys(k for k in (ts if isinstance(ts, list) else []) if k in out["rules"]))
+        c["types"] = list(dict.fromkeys(k for k in (ts if isinstance(ts, list) else []) if k in DEFAULT["rules"]))
         for f in {
             "ntfy": ["url"],
             "telegram": ["bot_token", "chat_id"],
