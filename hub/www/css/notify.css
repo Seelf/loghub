@@ -162,6 +162,24 @@ button.mini {
   margin: 0;
   flex: none;
 }
+.chn .trows {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.chn .trow {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+.chn .trow select {
+  flex: 1;
+  padding: 4px 8px;
+}
+.chn .trow button {
+  flex: none;
+  padding: 4px 9px;
+}
 .acts {
   display: flex;
   flex-wrap: wrap;

@@ -90,6 +90,50 @@ const CHT = {
 };
 let NC = null,
   ndirty = false;
+// jeden cel powiadomien: serwer + (opcjonalnie) konkretny kontener lub usługa; pusty target = caly serwer
+function tgtRow(c, i) {
+  const t = c.targets[i],
+    r = el('div', 'trow');
+  const ho = el('select'),
+    ta = el('select');
+  ho.append(new Option('serwer…', ''));
+  for (const n of [...D.hosts.keys()].sort()) ho.append(new Option(n, n));
+  if (t.host && !D.hosts.has(t.host)) ho.append(new Option(t.host + ' (nieznany)', t.host));
+  ho.value = t.host || '';
+  const fill = () => {
+    ta.textContent = '';
+    ta.append(new Option('cały serwer', ''));
+    const s = D.stat.get(t.host);
+    if (s) {
+      for (const n of [...s.cmap.keys()].sort()) ta.append(new Option('kontener: ' + n, n));
+      for (const n of [...s.umap.keys()].sort())
+        if (/\.service$/.test(n)) ta.append(new Option('usługa: ' + n, n));
+    }
+    if (t.target && ![...ta.options].some(o => o.value === t.target))
+      ta.append(new Option(t.target + ' (nieznany)', t.target));
+    ta.value = t.target || '';
+  };
+  fill();
+  ho.onchange = () => {
+    t.host = ho.value;
+    t.target = '';
+    fill();
+    ndirty = true;
+  };
+  ta.onchange = () => {
+    t.target = ta.value;
+    ndirty = true;
+  };
+  const rm = el('button', '', '✕');
+  rm.title = 'usuń cel';
+  rm.onclick = () => {
+    c.targets.splice(i, 1);
+    ndirty = true;
+    renderNset();
+  };
+  r.append(ho, ta, rm);
+  return r;
+}
 function alertRow(a, hist) {
   const ev = a.since && a.since === a.until,
     r = el('div', 'al ' + (hist && !ev ? 'ok' : a.sev || 'error')),
@@ -231,6 +275,25 @@ function renderNset() {
       l.append(i);
       w.append(l);
     }
+    // które serwery i usługi: pusta lista = wszystkie, pusty target = cały serwer;
+    // wybrana usługa pasuje tez do wysypu błędów i błędów cron z tego samego źródła
+    if (!Array.isArray(c.targets)) c.targets = [];
+    const tt = el('div', 'kinds'),
+      trows = el('div', 'trows');
+    c.targets.forEach((t, i) => trows.append(tgtRow(c, i)));
+    const tadd = el('button', 'mini', '+ dodaj cel');
+    tadd.onclick = () => {
+      c.targets.push({ host: '', target: '' });
+      ndirty = true;
+      renderNset();
+    };
+    tt.append(
+      el('b', '', 'Które serwery i usługi'),
+      trows,
+      tadd,
+      el('small', '', 'bez zaznaczenia = wszystkie'),
+    );
+    w.append(tt);
     // co ten kanal dostaje: puste = wszystkie typy; wiadomosc testowa idzie zawsze na wlaczone kanaly
     const kt = el('div', 'kinds'),
       kq = el('span', 'kq'),

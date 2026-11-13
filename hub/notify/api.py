@@ -52,6 +52,17 @@ def clean_config(new, old):
         # walidacja wobec kanonicznej listy typow (klucze rules w settings.py), nie wobec ustawien uzytkownika
         ts = ch.get("types")
         c["types"] = list(dict.fromkeys(k for k in (ts if isinstance(ts, list) else []) if k in DEFAULT["rules"]))
+        # konkretne serwery i uslugi; pusta lista = wszystkie, pusty target = caly serwer;
+        # nieznanego hosta sie akceptuje (moze zniknac), wpis po prostu nie bedzie pasowac do niczego
+        tg, out_tg = ch.get("targets"), []
+        for t0 in (tg if isinstance(tg, list) else [])[:50]:
+            if not isinstance(t0, dict):
+                continue
+            h, tgt = str(t0.get("host") or "").strip()[:100], str(t0.get("target") or "").strip()[:200]
+            if not h or any(x["host"] == h and x["target"] == tgt for x in out_tg):
+                continue
+            out_tg.append({"host": h, "target": tgt})
+        c["targets"] = out_tg
         for f in {
             "ntfy": ["url"],
             "telegram": ["bot_token", "chat_id"],

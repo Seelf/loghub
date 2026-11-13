@@ -166,9 +166,11 @@ Usługa `notify` na centrali co minutę sprawdza: brak kontaktu z maszyną, padn
 zadań cron, zapełnienie każdego dysku, awarię dysku (SMART) i pule ZFS poza stanem ONLINE, wysokie CPU i RAM,
 port nowo otwarty na świat w zaporze ufw (jedno powiadomienie z oknem czasowym zmiany) albo wyłączenie ufw,
 nagły wysyp błędów w logach. Kanały: ntfy, Telegram, Discord,
-webhook, e-mail. Każdy kanał może dostawać tylko wybrane typy alertów (bez zaznaczenia = wszystkie),
-więc telefon nie musi się spinać od każdego zdarzenia; wiadomość testowa idzie na wszystkie włączone
-kanały. Ustawienia: zakładka Powiadomienia (tylko administrator).
+webhook, e-mail. Każdy kanał można zawęzić do wybranych serwerów i usług (np. tylko TeamSpeak
+na VPS: powiadomienie idzie, gdy coś dzieje się właśnie z tymi celami) i do wybranych typów alertów —
+bez zaznaczenia = wszystkie. Zadania cron nie są osobnymi celami — pokrywa je wybór
+całego serwera. Wiadomość testowa omija filtry i idzie na wszystkie włączone kanały: sprawdza
+sam kanał, nie filtry. Ustawienia: zakładka Powiadomienia (tylko administrator).
 
 ## Zadania cron
 

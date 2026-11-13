@@ -79,9 +79,25 @@ def send_channel(ch, what, a):
 
 
 def channel_allows(ch, what, a):
-    """Czy kanal dostaje dany alert: puste 'types' = wszystko; wiadomosc testowa idzie na wszystkie wlaczone."""
+    """Czy kanal dostaje dany alert.
+
+    Dwa filtry per kanal, kazdy pusty = wszystko (kompatybilne ze starymi instalacjami):
+    - 'types': typy alertow (klucze rules z settings.py),
+    - 'targets': konkretne serwery i usługi ({host, target}; pusty target = cały serwer);
+      wybrana usługa pasuje też do wysypu błędów i błędów cron z tego samego źródła.
+    Wiadomość testowa idzie na wszystkie włączone kanały.
+    """
+    if what == "test":
+        return True
     kinds = ch.get("types") or []
-    return what == "test" or not kinds or a.get("kind") in kinds
+    if kinds and a.get("kind") not in kinds:
+        return False
+    ts = ch.get("targets") or []
+    if ts:
+        h, u = a.get("host") or "", a.get("unit") or ""
+        if not any(t.get("host") == h and (not t.get("target") or t.get("target") == u) for t in ts):
+            return False
+    return True
 
 
 def deliver(cfg, what, a):
