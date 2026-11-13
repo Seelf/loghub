@@ -228,4 +228,7 @@ docs/                      diagram
 
 Strona nie ma kroku budowania: zmieniony plik w `hub/www` od razu działa. Podgląd bez centrali:
 `cd hub/www && python3 -m http.server 8765`, potem `http://localhost:8765/?demo`.
-Formatowanie: `prettier --write hub/www` (ustawienia w `.prettierrc`), `black -l 120 hub/auth hub/notify`.
+Weryfikacja i formatowanie: `make check` (bash -n, shellcheck, py_compile, black, prettier) i `make format`
+(prettier dla `hub/www`, `black -l 120` dla `hub/auth` i `hub/notify`); piny narzędzi są w Makefile.
+Instrukcje dla agentów AI: [AGENTS.md](AGENTS.md) (konwencje, petla weryfikacji, inwarianty bezpieczeństwa);
+po pushu CI uruchamia te same sprawdziany.
