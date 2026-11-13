@@ -1,3 +1,4 @@
+# shellcheck shell=bash
 # loghub: na Proxmoxie agent instaluje sie tez w kazdym dzialajacym kontenerze LXC i w maszynach wirtualnych.
 # Wylacza to opcja --no-lxc (dotyczy obu).
 
@@ -6,6 +7,9 @@ fan_out_lxc() {
   have pct || return 0
   [ "$DO_LXC" = 1 ] || return 0
   local id pack=/tmp/loghub-src.tgz
+  local -a lxc_flags=(--no-lxc --no-tailscale)
+  [ "$DO_CRON" = 1 ] || lxc_flags+=(--no-cron)
+  [ "$DO_STATUS" = 1 ] || lxc_flags+=(--no-status)
   tar czf "$pack" -C "$(dirname "$SRC_DIR")" "$(basename "$SRC_DIR")"
   for id in $(pct list 2>/dev/null | awk 'NR>1 && $2=="running" {print $1}'); do
     say "LXC $id"
@@ -16,7 +20,7 @@ fan_out_lxc() {
     pct push "$id" "$pack" "$pack" </dev/null >/dev/null
     pct exec "$id" -- sh -c "rm -rf /tmp/loghub-src && mkdir /tmp/loghub-src && tar xzf $pack -C /tmp/loghub-src && rm -f $pack" </dev/null
     pct exec "$id" -- bash /tmp/loghub-src/loghub/install.sh agent --hub "$HUB_LAN" --token "$TOKEN" \
-      --no-lxc --no-tailscale $( [ "$DO_CRON" = 1 ] || echo --no-cron ) $( [ "$DO_STATUS" = 1 ] || echo --no-status ) </dev/null || warn "LXC $id: instalacja nieudana"
+      "${lxc_flags[@]}" </dev/null || warn "LXC $id: instalacja nieudana"
     pct exec "$id" -- rm -rf /tmp/loghub-src </dev/null || true
   done
   rm -f "$pack"

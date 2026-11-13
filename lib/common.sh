@@ -1,5 +1,7 @@
+# shellcheck shell=bash
 # loghub: wspolne ustawienia i drobne funkcje uzywane przez reszte skryptow.
 # Ten plik jest wczytywany (source) przez install.sh; sam niczego nie uruchamia.
+# shellcheck disable=SC2034  # zmienne sa uzywane w innych plikach lib/ (wczytywane razem przez install.sh)
 
 # Repozytorium na GitHubie (musi byc publiczne). Inna nazwa: LOGHUB_REPO=uzytkownik/repo
 REPO="${LOGHUB_REPO:-Seelf/loghub}"

@@ -1,6 +1,8 @@
+# shellcheck shell=bash
 # loghub: pomiar stanu i zasobow na agencie.
 # Co ok. 20 s (agent/status/status.sh): CPU, RAM, dysk, obciazenie; stan kontenerow Dockera,
 # uslug systemd i (na Proxmoxie) gosci LXC/VM. Wynik idzie jako JSON do journald, a stamtad przez Vectora do centrali.
+# shellcheck disable=SC2034  # zmienne sa uzywane w innych plikach lib/ (wczytywane razem przez install.sh)
 
 # Kopiuje skrypt pomiaru do $CRON_LIB i usluge systemd.
 write_status_files() {

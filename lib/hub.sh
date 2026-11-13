@@ -1,3 +1,4 @@
+# shellcheck shell=bash
 # loghub: centrala (polecenia "hub", "user", "public").
 # Centrala to kilka kontenerow Dockera w $HUB_DIR: baza logow VictoriaLogs, usluga logowania (auth),
 # powiadomienia (notify) i Caddy, ktory serwuje strone i przyjmuje logi od agentow.
@@ -56,9 +57,9 @@ cmd_hub() {
   # pliki uslug sa montowane z dysku: restart, zeby zaladowaly nowa wersje
   (cd "$HUB_DIR" && docker compose restart auth notify caddy </dev/null >/dev/null 2>&1) || true
 
-  local admin_out="" i
+  local admin_out=""
   if [ ! -s "$HUB_DIR/authdata/users.json" ]; then
-    for i in 1 2 3 4 5 6 7 8 9 10; do
+    for _ in 1 2 3 4 5 6 7 8 9 10; do
       admin_out="$(auth_cli add admin --role admin 2>/dev/null)" && break
       sleep 2
     done

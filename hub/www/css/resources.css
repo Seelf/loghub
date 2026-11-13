@@ -94,10 +94,9 @@
   cursor: default;
 }
 #ptbl .tr {
-  grid-template-columns: minmax(120px, 1fr) 60px minmax(130px, 1.2fr) 70px minmax(120px, 1.1fr) minmax(
-      160px,
-      1.3fr
-    ) minmax(130px, 1fr);
+  grid-template-columns:
+    minmax(120px, 1fr) 60px minmax(130px, 1.2fr) 70px minmax(120px, 1.1fr) minmax(160px, 1.3fr)
+    minmax(130px, 1fr);
   min-width: 900px;
   cursor: default;
 }
@@ -131,10 +130,9 @@
   margin-top: 10px;
 }
 #rtbl .tr {
-  grid-template-columns: minmax(160px, 1.6fr) 90px minmax(90px, 1fr) minmax(130px, 1.2fr) minmax(
-      150px,
-      1.4fr
-    ) minmax(140px, 1.4fr);
+  grid-template-columns:
+    minmax(160px, 1.6fr) 90px minmax(90px, 1fr) minmax(130px, 1.2fr) minmax(150px, 1.4fr)
+    minmax(140px, 1.4fr);
   min-width: 820px;
 }
 #rtbl .tr {

@@ -1,3 +1,4 @@
+# shellcheck shell=bash
 # loghub: konfiguracja Vectora, ktory na kazdej maszynie zbiera logi i wysyla je do centrali.
 #
 # Zrodla: dziennik systemd, pliki z /var/log (i z --logs), logi TeamSpeak 3, kontenery Dockera.

@@ -1,7 +1,9 @@
+# shellcheck shell=bash
 # loghub: agent (polecenia "agent" i "uninstall-agent").
 # Agent to Vector, ktory zbiera logi tej maszyny i wysyla je do centrali, plus dwie male uslugi:
 # loghub-cron (wyniki zadan cron, lib/agent-cron.sh) i loghub-status (zasoby i stan uslug, lib/agent-status.sh).
 # Konfiguracje Vectora sklada lib/agent-vector.sh, a na Proxmoxie lib/proxmox.sh instaluje agenta dalej w LXC i VM.
+# shellcheck disable=SC2034  # zmienne sa uzywane w innych plikach lib/ (wczytywane razem przez install.sh)
 
 # Vector z oficjalnego repozytorium apt; uzytkownik "vector" dostaje grupy z dostepem do dziennika, logow i Dockera.
 install_vector() {

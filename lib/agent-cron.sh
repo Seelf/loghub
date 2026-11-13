@@ -1,7 +1,9 @@
+# shellcheck shell=bash
 # loghub: podglad zadan cron na agencie.
 # Debianowy cron z opcja "-L 15" zapisuje start, koniec i kod wyjscia kazdego zadania.
 # Usluga loghub-cron (agent/cron/cron-watch.sh) sklada te wpisy w jeden rekord na uruchomienie (JSON do journald),
 # a co jakis czas wypisuje tez liste wszystkich zadan (polecenie "loghub cron-scan").
+# shellcheck disable=SC2034  # zmienne sa uzywane w innych plikach lib/ (wczytywane razem przez install.sh)
 
 # Kopiuje skrypty z agent/cron do $CRON_LIB i usluge systemd.
 write_cron_files() {
