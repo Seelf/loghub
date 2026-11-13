@@ -1,0 +1,14 @@
+# Linia logu TeamSpeak 3: "2026-11-11 11:41:36.123456|INFO    |Query |   |tresc".
+# Czas w pliku jest w UTC; poziom zamieniamy na liczbowy jak w syslogu (3 blad, 4 ostrzezenie, 6 info, 7 reszta).
+msg = string(.message) ?? ""
+ts = .timestamp
+lvl = ""
+p, err = parse_regex(msg, r'^(?P<t>[0-9]{4}-[0-9]{2}-[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2}(\.[0-9]+)?)\|(?P<l>[A-Z]+) *\|(?P<r>.*)$')
+if err == null {
+  t2, e2 = parse_timestamp(string!(p.t) + " +0000", "%Y-%m-%d %H:%M:%S%.f %z")
+  if e2 == null { ts = t2 }
+  l = string!(p.l)
+  lvl = if l == "ERROR" || l == "CRITICAL" { "3" } else if l == "WARNING" { "4" } else if l == "INFO" { "6" } else { "7" }
+  msg = l + " |" + string!(p.r)
+}
+. = {"host": "@HOST@", "source": "file", "unit": "teamspeak", "level": lvl, "message": msg, "timestamp": ts}

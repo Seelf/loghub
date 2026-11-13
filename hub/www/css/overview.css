@@ -1,0 +1,336 @@
+/* Przeglad: zakladki, kafle, karty serwerow, tabela zrodel, zdarzenia (incydenty). */
+/* przeglad */
+#over {
+  flex: 1;
+  overflow: auto;
+  padding: 18px 22px 28px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+#over > header {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+#tabs {
+  display: flex;
+  gap: 4px;
+  border-bottom: 1px solid var(--line);
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+#tabs::-webkit-scrollbar {
+  display: none;
+}
+#tabs button {
+  flex: none;
+  background: none;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  border-radius: 0;
+  padding: 8px 12px;
+  color: var(--mut);
+}
+#tabs button.on {
+  color: var(--nav);
+  border-bottom-color: var(--nav);
+  font-weight: 600;
+}
+.tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 10px;
+}
+.tiles div {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  padding: 10px 14px;
+  min-width: 0;
+}
+.tiles b {
+  font-size: 22px;
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+}
+.tiles span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.tiles .go:hover {
+  border-color: var(--mut);
+}
+.tiles .e b {
+  color: var(--err);
+}
+.tiles .w b {
+  color: var(--acc2);
+}
+.tiles .g b {
+  color: var(--acc);
+}
+#cards {
+  columns: 340px;
+  column-gap: 12px;
+}
+#cards > .card {
+  break-inside: avoid;
+  margin-bottom: 12px;
+}
+.card {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.card.off {
+  border-color: var(--warn);
+}
+.card header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.card header b {
+  font: 600 15px var(--mono);
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.card header .chip {
+  margin-left: auto;
+}
+.row {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+.row .num {
+  margin-left: auto;
+}
+.kv {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+  border-top: 1px solid var(--line);
+  padding-top: 10px;
+}
+.kv div {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.kv b {
+  font-size: 16px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.kv .e {
+  color: var(--err);
+}
+.kv .w {
+  color: var(--warn);
+}
+.card footer {
+  display: flex;
+  gap: 8px;
+  border-top: 1px solid var(--line);
+  padding-top: 10px;
+}
+.card footer button {
+  flex: 1;
+}
+#tools {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+#us {
+  flex: 1 1 200px;
+}
+#tbl {
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  background: var(--card);
+  overflow-x: auto;
+}
+.tr {
+  display: grid;
+  grid-template-columns: minmax(150px, 2fr) minmax(70px, 1fr) 78px minmax(130px, 1.5fr) 64px 64px 112px;
+  gap: 12px;
+  align-items: center;
+  padding: 7px 14px;
+  border-bottom: 1px solid var(--line);
+  min-width: 760px;
+}
+.tr:last-child {
+  border-bottom: 0;
+}
+.tr > * {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.tr.h {
+  font-size: 11px;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--mut);
+}
+.tr:not(.h) {
+  cursor: pointer;
+}
+.tr:not(.h):hover {
+  background: var(--sel);
+}
+.tr > :first-child {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--mono);
+  overflow: hidden;
+  white-space: nowrap;
+}
+.vol {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.vol i {
+  height: 4px;
+  border-radius: 2px;
+  background: var(--acc);
+  min-width: 1px;
+}
+.vol span {
+  font-variant-numeric: tabular-nums;
+  width: 44px;
+  flex: none;
+  text-align: right;
+}
+#errs {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.itools {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+.days {
+  display: flex;
+  gap: 3px;
+  overflow-x: auto;
+  padding-bottom: 2px;
+}
+.days button {
+  flex: 1 0 24px;
+  min-width: 24px;
+  height: 46px;
+  padding: 3px 1px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 10px;
+  color: var(--mut);
+}
+.days button b {
+  font-size: 13px;
+  color: var(--fg);
+  font-variant-numeric: tabular-nums;
+}
+.days button.l1 {
+  background: var(--warnbg);
+  border-color: var(--warn);
+}
+.days button.l2 {
+  background: var(--errbg);
+  border-color: var(--err);
+}
+.days button.l3 {
+  background: var(--err);
+  border-color: var(--err);
+  color: var(--bg);
+}
+.days button.l3 b {
+  color: var(--bg);
+}
+.days button.on {
+  outline: 2px solid var(--acc);
+  outline-offset: 1px;
+}
+.ilist {
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  background: var(--card);
+}
+.inc {
+  display: grid;
+  grid-template-columns: 170px minmax(0, 1fr) auto;
+  gap: 4px 14px;
+  padding: 9px 14px;
+  border-bottom: 1px solid var(--line);
+  align-items: center;
+}
+.inc:last-child {
+  border-bottom: 0;
+}
+.inc .when {
+  font-variant-numeric: tabular-nums;
+  color: var(--mut);
+}
+.inc .what {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+  min-width: 0;
+}
+.inc .what b {
+  font-family: var(--mono);
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 100%;
+}
+.inc .msgs {
+  grid-column: 2/4;
+  font: 12px/1.5 var(--mono);
+  color: var(--mut);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.inc .msgs > div {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.inc .msgs button {
+  align-self: flex-start;
+  font: 12px var(--sans);
+  padding: 1px 8px;
+}
+.tiles .go {
+  cursor: pointer;
+}
+@media (max-width: 700px) {
+  .inc {
+    grid-template-columns: 1fr;
+  }
+  .inc .msgs {
+    grid-column: auto;
+  }
+}

@@ -12,7 +12,7 @@ na świat można wystawić samą stronę z logowaniem.
 |---|---|---|
 | Centrala | kontener LXC na Proxmoxie (albo dowolna maszyna z Dockerem) | VictoriaLogs (baza logów, 2 lata), Caddy (dwa wejścia), `auth.py` (logowanie + 2FA) |
 | Agent | każda obserwowana maszyna | Vector jako usługa systemd; czyta journald, `/var/log/**/*.log`, logi Dockera, wyniki crona |
-| Strona | serwowana przez centralę | jeden plik `hub/www/index.html`, bez bibliotek |
+| Strona | serwowana przez centralę | `hub/www`: HTML, CSS i JavaScript bez bibliotek i bez budowania |
 
 Wejścia centrali:
 
@@ -184,14 +184,48 @@ listę zadań w crontabach. Działa z cronem z Debiana, Ubuntu i Proxmoxa. Cront
 - Repozytorium nie zawiera żadnych sekretów; tokeny i hasła powstają przy instalacji i zostają na centrali
   (`/opt/loghub/.env`, `/opt/loghub/authdata/`).
 
-## Pliki
+## Struktura projektu
+
+Każdy plik robi jedną rzecz i zaczyna się od komentarza, co w nim jest.
 
 ```
-install.sh            instalator centrali i agenta; po instalacji dostępny jako polecenie `loghub`
-proxmox.sh            tworzy kontener LXC z centralą na Proxmoxie
-hub/www/index.html    strona
-hub/www/demo.js       przykładowe dane dla ?demo
-hub/auth/auth.py      logowanie, 2FA, konta
-hub/notify/notify.py  powiadomienia
-docs/                 diagram
+install.sh                 polecenie "loghub": znajduje resztę plików i uruchamia wybrane polecenie
+proxmox.sh                 tworzy kontener LXC z centralą na Proxmoxie
+
+lib/                       kod instalatora (Bash), wczytywany przez install.sh
+  common.sh                ustawienia, komunikaty, apt, Tailscale, instalacja polecenia "loghub"
+  hub.sh                   centrala: loghub hub | user | public
+  agent.sh                 agent: loghub agent | uninstall-agent
+  agent-vector.sh          składa /etc/vector/vector.yaml ze źródeł i programów VRL
+  agent-cron.sh            podgląd zadań cron
+  agent-status.sh          pomiar zasobów i stanu usług
+  proxmox.sh               agent dalej w kontenerach LXC i maszynach VM
+
+agent/                     pliki kopiowane na obserwowane maszyny
+  vector/*.vrl             jak wpis z dziennika, pliku, TeamSpeaka i Dockera staje się rekordem loghub
+  vector/vector-access.conf  prawo odczytu logów dla Vectora (systemd)
+  cron/                    cron.awk, scan.awk, cron-watch.sh i usługa loghub-cron
+  status/                  status.sh i usługa loghub-status
+
+hub/                       centrala (kopiowana do /opt/loghub)
+  docker-compose.yml       VictoriaLogs, auth, notify, Caddy
+  Caddyfile                wejścia 8080 (prywatne), 8081 (publiczne), 8082 (strona statusu)
+  www/index.html           szkielet strony (widoki i formularze)
+  www/css/*.css            wygląd: motywy, szkło, układ, osobny plik na każdy widok, telefon
+  www/js/*.js              logika strony, plik na widok; ładowane po kolei, app.js na końcu uruchamia całość
+  www/demo.js              przykładowe dane dla ?demo
+  auth/                    logowanie, 2FA, konta i dostęp do logów
+    auth.py                start usługi i polecenia "user"
+    config.py, accounts.py, totp.py, sessions.py, login.py, proxy.py, users_api.py, server.py, cli.py
+  notify/                  powiadomienia i strona statusu
+    notify.py              start usługi
+    settings.py, store.py, logsdb.py, checks.py, statuspage.py, channels.py, api.py
+  status/index.html        publiczna strona statusu
+
+loghub-agent/              dodatek do Home Assistant OS
+docs/                      diagram
 ```
+
+Strona nie ma kroku budowania: zmieniony plik w `hub/www` od razu działa. Podgląd bez centrali:
+`cd hub/www && python3 -m http.server 8765`, potem `http://localhost:8765/?demo`.
+Formatowanie: `prettier --write hub/www` (ustawienia w `.prettierrc`), `black -l 120 hub/auth hub/notify`.

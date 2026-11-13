@@ -1,0 +1,20 @@
+# Uslugi loghub-cron i loghub-status wypisuja JSON: staje sie on rekordem "cron", "crondef" albo "stat".
+# Listy (kontenery, uslugi, dyski...) ida do bazy jako tekst JSON, bo VictoriaLogs trzyma pola plaskie.
+ident = string(.SYSLOG_IDENTIFIER) ?? ""
+if ident == "loghub-cron" || ident == "loghub-status" {
+  run, err = parse_json(msg)
+  if err == null && is_object(run) {
+    r = object!(run)
+    if is_array(r.containers) { r.containers = encode_json(r.containers) }
+    if is_array(r.cstats) { r.cstats = encode_json(r.cstats) }
+    if is_array(r.units) { r.units = encode_json(r.units) }
+    if is_array(r.guests) { r.guests = encode_json(r.guests) }
+    if is_array(r.disks) { r.disks = encode_json(r.disks) }
+    if is_array(r.pools) { r.pools = encode_json(r.pools) }
+    if is_array(r.smart) { r.smart = encode_json(r.smart) }
+    if is_array(r.ports) { r.ports = encode_json(r.ports) }
+    if is_array(r.ufw) { r.ufw = encode_json(r.ufw) }
+    out = merge(out, r)
+    out.host = "@HOST@"
+  }
+}

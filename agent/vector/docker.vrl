@@ -1,0 +1,3 @@
+# Kontener Dockera: jednostka = nazwa kontenera.
+unit = string(.container_name) ?? "container"
+. = {"host": "@HOST@", "source": "docker", "unit": unit, "message": string(.message) ?? "", "timestamp": .timestamp}

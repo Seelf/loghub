@@ -42,7 +42,7 @@ main() {
 
   local src="${BASH_SOURCE[0]:-}" dir="" ctid storage tstore tmpl net i ip token answer
   # uruchomione z rozpakowanego katalogu: pliki ida do kontenera stad, nie z GitHuba
-  if [ -n "$src" ] && [ -f "$(dirname "$src")/install.sh" ] && [ -f "$(dirname "$src")/hub/www/index.html" ]; then
+  if [ -n "$src" ] && [ -f "$(dirname "$src")/install.sh" ] && [ -f "$(dirname "$src")/lib/common.sh" ]; then
     dir="$(cd "$(dirname "$src")" && pwd)"
   fi
 
@@ -92,7 +92,7 @@ main() {
   say "Instaluje centrale w kontenerze (Docker, Tailscale, VictoriaLogs, strona)"
   if [ -n "$dir" ]; then
     pct exec "$ctid" -- mkdir -p /opt/loghub-src
-    tar -C "$dir" -cf - install.sh hub | pct exec "$ctid" -- tar -C /opt/loghub-src -xf -
+    tar -C "$dir" -cf - install.sh lib agent hub | pct exec "$ctid" -- tar -C /opt/loghub-src -xf -
     pct exec "$ctid" -- env TS_AUTHKEY="${TS_AUTHKEY:-}" LOGHUB_REPO="$REPO" bash /opt/loghub-src/install.sh hub </dev/null
   else
     pct exec "$ctid" -- bash -c "apt-get update -qq && apt-get install -y -qq curl ca-certificates >/dev/null" </dev/null

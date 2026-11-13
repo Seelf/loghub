@@ -1,0 +1,67 @@
+/* Zadania cron. */
+#cronv {
+  flex: 1;
+  overflow: auto;
+  padding: 18px 22px 28px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+#cronv > header {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+#ctools {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+#cs {
+  flex: 1 1 200px;
+}
+#ctbl {
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  background: var(--card);
+  overflow-x: auto;
+}
+#ctbl .tr {
+  grid-template-columns: 118px minmax(220px, 2.2fr) minmax(70px, 0.8fr) minmax(170px, 1.3fr) 150px 44px 172px;
+  min-width: 1000px;
+}
+#ctbl .tr > :first-child {
+  font-family: var(--sans);
+}
+.job {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.job b {
+  font: 400 12px var(--mono);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.job small {
+  color: var(--mut);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.hist {
+  display: flex;
+  gap: 2px;
+  align-items: center;
+  height: 16px;
+}
+.hist i {
+  width: 6px;
+  height: 14px;
+  border-radius: 2px;
+  background: var(--acc);
+}
+.hist i.e {
+  background: var(--err);
+}

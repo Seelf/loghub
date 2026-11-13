@@ -1,0 +1,12 @@
+[Unit]
+Description=loghub: wyniki i lista zadan cron
+After=systemd-journald.service cron.service
+
+[Service]
+ExecStart=/usr/local/lib/loghub/cron-watch.sh
+SyslogIdentifier=loghub-cron
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

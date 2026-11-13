@@ -1,0 +1,71 @@
+/* Ekran logowania. */
+/* logowanie */
+#login {
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+}
+#login form {
+  width: 340px;
+  max-width: 100%;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  padding: 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+#login label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--mut);
+}
+#login input {
+  padding: 8px 10px;
+  color: var(--fg);
+}
+#lgo {
+  background: var(--acc);
+  border-color: var(--acc);
+  color: var(--bg);
+  font-weight: 600;
+  padding: 8px;
+}
+#lerr {
+  color: var(--err);
+  min-height: 1.4em;
+}
+#enr {
+  border: 1px solid var(--acc2);
+  border-radius: 8px;
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+#key {
+  font: 14px var(--mono);
+  letter-spacing: 0.06em;
+  overflow-wrap: anywhere;
+  color: var(--fg);
+}
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 17px;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+}
+.brand i {
+  width: 14px;
+  height: 14px;
+  border-radius: 4px;
+  background: var(--acc);
+  box-shadow: 5px 5px 0 -2px var(--acc2);
+}

@@ -1,0 +1,204 @@
+/* Widok logow: naglowek zrodla, strumien, pasek stanu. */
+/* logi */
+#logs {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+#head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 14px;
+  padding: 9px 14px;
+  border-bottom: 1px solid var(--line);
+  background: var(--panel);
+}
+#title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  flex: 1 1 220px;
+}
+#title b {
+  font: 600 14px var(--mono);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.stat {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 4px 10px;
+  background: var(--card);
+}
+.stat b {
+  font-size: 14px;
+  font-variant-numeric: tabular-nums;
+}
+.stat .sp {
+  width: 120px;
+  height: 22px;
+}
+#live {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+#live[aria-pressed='true'] {
+  color: var(--acc);
+  border-color: var(--acc);
+}
+#live[aria-pressed='true'] .dot {
+  background: var(--acc);
+  opacity: 1;
+  animation: pulse 1.6s infinite;
+}
+@keyframes pulse {
+  50% {
+    opacity: 0.35;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  #live .dot {
+    animation: none !important;
+  }
+}
+#bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 7px 14px;
+  border-bottom: 1px solid var(--line);
+}
+#q {
+  flex: 1 1 200px;
+}
+#box {
+  flex: 1;
+  min-height: 0;
+  position: relative;
+}
+#log {
+  height: 100%;
+  overflow: auto;
+  position: relative;
+  padding: 4px 0;
+  font: 12px/1.6 var(--mono);
+}
+.r {
+  display: flex;
+  gap: 9px;
+  padding: 0 14px 0 11px;
+  border-left: 3px solid transparent;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.r:hover {
+  background: var(--panel);
+}
+.r time {
+  flex: none;
+  color: var(--mut);
+  font-variant-numeric: tabular-nums;
+}
+.r .lv {
+  flex: none;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  margin-top: 0.55em;
+  background: var(--line);
+}
+.r b {
+  flex: none;
+  color: var(--acc);
+  font-weight: 400;
+}
+.r.e {
+  border-left-color: var(--err);
+  background: var(--errbg);
+}
+.r.e .lv {
+  background: var(--err);
+}
+.r.e span {
+  color: var(--err);
+}
+.r.w {
+  border-left-color: var(--warn);
+  background: var(--warnbg);
+}
+.r.w .lv {
+  background: var(--warn);
+}
+.r.w span {
+  color: var(--warn);
+}
+mark {
+  background: var(--hl);
+  color: inherit;
+  border-radius: 2px;
+}
+.n {
+  padding: 24px 14px;
+  color: var(--mut);
+  font-family: var(--sans);
+}
+#pos {
+  position: absolute;
+  top: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  padding: 4px 14px;
+  font-size: 12px;
+  white-space: nowrap;
+  pointer-events: none;
+}
+#pos u {
+  display: block;
+  width: 120px;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--line);
+  overflow: hidden;
+}
+#pos u i {
+  display: block;
+  height: 100%;
+  background: var(--acc);
+}
+#jump {
+  position: absolute;
+  right: 22px;
+  bottom: 16px;
+  background: var(--acc);
+  color: var(--bg);
+  border-color: var(--acc);
+  border-radius: 8px;
+  padding: 8px 12px;
+  font-weight: 600;
+}
+#st {
+  display: flex;
+  gap: 12px;
+  padding: 4px 14px;
+  border-top: 1px solid var(--line);
+  color: var(--mut);
+  font-size: 11px;
+}
+#st a {
+  color: inherit;
+  margin-left: auto;
+}

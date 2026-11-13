@@ -1,0 +1,60 @@
+services:
+  victorialogs:
+    image: victoriametrics/victoria-logs:${VL_TAG:-latest}
+    command:
+      - -storageDataPath=/vlogs
+      - -retentionPeriod=${RETENTION:-730d}
+    volumes:
+      - ./data:/vlogs
+    restart: unless-stopped
+
+  auth:
+    image: python:3.13-alpine
+    command: ["python", "/app/auth.py", "serve"]
+    environment:
+      - SESSION_SECRET=${SESSION_SECRET}
+      - LOGHUB_DATA=/data
+      - VL_URL=http://victorialogs:9428
+    volumes:
+      - ./auth:/app:ro
+      - ./authdata:/data
+    restart: unless-stopped
+
+  notify:
+    image: python:3.13-alpine
+    command: ["python", "/app/notify.py"]
+    environment:
+      - LOGHUB_DATA=/data
+      - VL_URL=http://victorialogs:9428
+      - PUBLIC_URL=${PUBLIC_URL:-}
+      # dla panelu "Dodaj maszyne" (widzi go tylko administrator)
+      - INGEST_TOKEN=${INGEST_TOKEN}
+      - HUB_LAN_URL=${HUB_LAN_URL:-}
+      - HUB_TS_URL=${HUB_TS_URL:-}
+      - LOGHUB_REPO=${LOGHUB_REPO:-Seelf/loghub}
+    volumes:
+      - ./notify:/app:ro
+      - ./notifydata:/data
+      - ./status:/status
+      - /etc/localtime:/etc/localtime:ro
+    depends_on:
+      - victorialogs
+    restart: unless-stopped
+
+  caddy:
+    image: caddy:2-alpine
+    ports:
+      - "${PORT:-8080}:8080"
+      - "127.0.0.1:8081:8081"
+      - "127.0.0.1:8082:8082"
+    environment:
+      - INGEST_TOKEN=${INGEST_TOKEN}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./www:/srv:ro
+      - ./status:/srv/status:ro
+    depends_on:
+      - victorialogs
+      - auth
+      - notify
+    restart: unless-stopped

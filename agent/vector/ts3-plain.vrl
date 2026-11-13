@@ -1,0 +1,2 @@
+# Zapasowa wersja dla TeamSpeak 3, gdy rozbior linii nie przejdzie walidacji: same linie, czas odbioru.
+. = {"host": "@HOST@", "source": "file", "unit": "teamspeak", "message": string(.message) ?? "", "timestamp": .timestamp}

@@ -1,0 +1,114 @@
+/* Widoki Uzytkownicy, Strona statusu i Dodaj maszyne: wspolny uklad, polecenia do skopiowania, wiersze uslug statusu. */
+#usersv,
+#statv,
+#addv {
+  flex: 1;
+  overflow: auto;
+  padding: 18px 22px 28px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+#usersv > *,
+#statv > *,
+#addv > * {
+  flex: none;
+}
+#usersv > header,
+#statv > header,
+#addv > header {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+.cmd {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 6px 0;
+  padding: 8px 8px 8px 12px;
+  background: var(--logbg, var(--panel));
+  border: 1px solid var(--line);
+  border-radius: var(--rs);
+}
+.cmd code {
+  flex: 1;
+  min-width: 0;
+  font: 12px/1.6 var(--mono);
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+.cmd button {
+  flex: none;
+  padding: 3px 10px;
+}
+.steps {
+  margin: 4px 0 0;
+  padding-left: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.steps li {
+  padding-left: 2px;
+}
+.aopts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 18px;
+  align-items: flex-end;
+}
+.aopts label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  color: var(--mut);
+}
+.aopts label.ck {
+  flex-direction: row;
+  align-items: center;
+  gap: 7px;
+}
+#addv h3 {
+  margin: 14px 0 2px;
+  font-size: 13px;
+}
+.srow {
+  display: grid;
+  grid-template-columns: minmax(130px, 1.4fr) minmax(90px, 1fr) 140px 120px minmax(130px, 1.4fr) 92px repeat(
+      3,
+      32px
+    );
+  gap: 6px;
+  align-items: center;
+}
+.srow button {
+  padding: 5px 0;
+}
+.srow .chip {
+  justify-content: center;
+}
+#statv code {
+  font-family: var(--mono);
+  font-size: 12px;
+  background: var(--panel);
+  padding: 1px 5px;
+  border-radius: 4px;
+}
+@media (max-width: 900px) {
+  .srow {
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+    padding-bottom: 10px;
+    border-bottom: 1px solid var(--line);
+  }
+  .srow > :nth-child(1) {
+    grid-column: span 6;
+  }
+  .srow > :nth-child(2),
+  .srow > :nth-child(3),
+  .srow > :nth-child(4),
+  .srow > :nth-child(5),
+  .srow > :nth-child(6) {
+    grid-column: span 3;
+  }
+}

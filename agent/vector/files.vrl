@@ -1,0 +1,3 @@
+# Plik z /var/log (albo z --logs): jednostka = sciezka pliku.
+unit = string(.file) ?? "file"
+. = {"host": "@HOST@", "source": "file", "unit": unit, "message": string(.message) ?? "", "timestamp": .timestamp}

@@ -1,0 +1,5 @@
+# Wpis z dziennika systemd -> rekord loghub (zrodlo "journald", jednostka = usluga).
+unit = string(._SYSTEMD_UNIT) ?? string(.SYSLOG_IDENTIFIER) ?? "kernel"
+level = string(.PRIORITY) ?? ""
+msg = string(.message) ?? ""
+out = {"host": "@HOST@", "source": "journald", "unit": unit, "level": level, "message": msg, "timestamp": .timestamp}

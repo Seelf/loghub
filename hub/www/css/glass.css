@@ -1,0 +1,171 @@
+/* Motywy "Apple" (glass, glass-light): przezroczyste panele z rozmyciem nad spokojnym tlem. */
+/* szklo: kolorowe tlo pod przezroczystymi panelami */
+:root[data-theme='glass'] body {
+  background:
+    radial-gradient(900px 640px at 18% 8%, rgba(70, 86, 120, 0.55), transparent 70%),
+    radial-gradient(800px 700px at 88% 30%, rgba(60, 64, 78, 0.6), transparent 70%),
+    radial-gradient(1000px 700px at 50% 105%, rgba(52, 66, 96, 0.5), transparent 70%), var(--bg);
+  background-attachment: fixed;
+  letter-spacing: -0.003em;
+}
+:root[data-theme='glass-light'] body {
+  background:
+    radial-gradient(900px 640px at 18% 8%, rgba(255, 255, 255, 0.95), transparent 70%),
+    radial-gradient(800px 700px at 88% 30%, rgba(196, 206, 224, 0.9), transparent 70%),
+    radial-gradient(1000px 700px at 50% 105%, rgba(214, 222, 236, 0.95), transparent 70%), var(--bg);
+  background-attachment: fixed;
+  letter-spacing: -0.003em;
+}
+
+[data-theme^='glass'] aside,
+[data-theme^='glass'] #head {
+  backdrop-filter: blur(40px) saturate(180%);
+  -webkit-backdrop-filter: blur(40px) saturate(180%);
+}
+[data-theme^='glass'] aside {
+  border-right: 1px solid var(--edge);
+}
+[data-theme^='glass'] .card,
+[data-theme^='glass'] .panel,
+[data-theme^='glass'] .tiles div,
+[data-theme^='glass'] .ilist,
+[data-theme^='glass'] .nlist,
+[data-theme^='glass'] #tbl,
+[data-theme^='glass'] #rtbl,
+[data-theme^='glass'] #dtbl,
+[data-theme^='glass'] #ptbl,
+[data-theme^='glass'] #ctbl,
+[data-theme^='glass'] #ulist,
+[data-theme^='glass'] .pwbox,
+[data-theme^='glass'] .stat,
+[data-theme^='glass'] #login form,
+[data-theme^='glass'] #pos {
+  border: 1px solid var(--edge);
+  backdrop-filter: blur(26px) saturate(180%);
+  -webkit-backdrop-filter: blur(26px) saturate(180%);
+  box-shadow:
+    inset 0 1px 0 var(--spec),
+    0 8px 28px var(--shade);
+}
+/* zakladki plywaja nad przewijana trescia - pod nimi widac rozmycie */
+[data-theme^='glass'] #tabs {
+  position: sticky;
+  top: -10px;
+  z-index: 5;
+  border: 1px solid var(--edge);
+  backdrop-filter: blur(30px) saturate(180%);
+  -webkit-backdrop-filter: blur(30px) saturate(180%);
+  box-shadow:
+    inset 0 1px 0 var(--spec),
+    0 6px 20px var(--shade);
+}
+[data-theme^='glass'] #box {
+  backdrop-filter: blur(26px);
+  -webkit-backdrop-filter: blur(26px);
+}
+[data-theme^='glass'] .card.off {
+  border-color: var(--warn);
+}
+[data-theme^='glass'] button {
+  background: var(--btn);
+  border-color: transparent;
+}
+[data-theme^='glass'] button:hover:not(:disabled) {
+  border-color: transparent;
+  filter: brightness(1.12);
+}
+[data-theme^='glass'] .tog,
+[data-theme^='glass'] #nav button,
+[data-theme^='glass'] #tabs button {
+  background: none;
+}
+[data-theme^='glass'] input,
+[data-theme^='glass'] select {
+  background: var(--field);
+}
+[data-theme^='glass'] #nav button {
+  border-left: 0;
+  padding: 6px 10px;
+}
+[data-theme^='glass'] #nav button.on {
+  background: var(--nav);
+  color: #fff;
+}
+[data-theme^='glass'] #nav button.on .chip {
+  color: #fff;
+  border-color: rgba(255, 255, 255, 0.7);
+  background: none;
+}
+[data-theme^='glass'] .it {
+  border-left: 0;
+  margin: 0 8px;
+  padding-left: 19px;
+  border-radius: 7px;
+}
+[data-theme^='glass'] .it.on {
+  background: var(--nav);
+  color: #fff;
+}
+[data-theme^='glass'] #tabs {
+  display: inline-flex;
+  align-self: flex-start;
+  max-width: 100%;
+  border: 1px solid var(--edge);
+  background: var(--seg);
+  border-radius: 11px;
+  padding: 3px;
+  gap: 2px;
+}
+[data-theme^='glass'] #tabs button {
+  border: 0;
+  border-radius: 7px;
+  padding: 5px 14px;
+  color: var(--fg);
+  font-weight: 500;
+}
+[data-theme^='glass'] #tabs button.on {
+  background: var(--segon);
+  color: var(--fg);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.18);
+}
+[data-theme^='glass'] .sp i:not(.z):not(.e),
+[data-theme^='glass'] .bar i:not(.w):not(.e),
+[data-theme^='glass'] .vol i,
+[data-theme^='glass'] .hist i:not(.e) {
+  background: var(--chart);
+}
+[data-theme^='glass'] #box {
+  background: var(--logbg);
+}
+[data-theme^='glass'] .r b {
+  color: var(--nav);
+}
+[data-theme^='glass'] #live[aria-pressed='true'] {
+  background: var(--btn);
+}
+[data-theme^='glass'] .r:hover {
+  background: var(--sel);
+}
+[data-theme^='glass'] button.pri,
+[data-theme^='glass'] #lgo,
+[data-theme^='glass'] #jump {
+  background: var(--nav);
+  border-color: var(--nav);
+  color: #fff;
+}
+[data-theme^='glass'] .days button.on {
+  outline-color: var(--nav);
+}
+[data-theme^='glass'] .chip {
+  border-radius: 7px;
+}
+[data-theme^='glass'] h1 {
+  font-weight: 700;
+  letter-spacing: -0.015em;
+}
+@media (prefers-reduced-transparency: reduce) {
+  [data-theme^='glass'] * {
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+  }
+}

@@ -1,0 +1,140 @@
+/* Powiadomienia oraz wspolne panele i przyciski widokow ustawien. */
+#notv {
+  flex: 1;
+  overflow: auto;
+  padding: 18px 22px 28px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+#notv > header {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+#notv > *,
+#cronv > *,
+#over > * {
+  flex: none;
+}
+.nlist {
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  background: var(--card);
+  overflow: hidden;
+}
+.al {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--line);
+  border-left: 3px solid var(--line);
+}
+.al:last-child {
+  border-bottom: 0;
+}
+.al.error {
+  border-left-color: var(--err);
+}
+.al.warn {
+  border-left-color: var(--warn);
+}
+.al.ok {
+  border-left-color: var(--acc);
+}
+.al > div {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.al b {
+  font-weight: 600;
+}
+.al small {
+  color: var(--mut);
+}
+.al.click {
+  cursor: pointer;
+}
+.al.click:hover {
+  background: var(--sel);
+}
+.al time {
+  color: var(--mut);
+  font-size: 12px;
+  white-space: nowrap;
+}
+.panel {
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  background: var(--card);
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.panel h2 {
+  font-size: 15px;
+  margin: 0;
+  font-weight: 600;
+}
+.rule {
+  display: grid;
+  grid-template-columns: 24px minmax(180px, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+}
+.rule .nums {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+  color: var(--mut);
+  font-size: 12px;
+}
+.rule input[type='number'] {
+  width: 72px;
+}
+.chn {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 10px;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 8px;
+  align-items: end;
+}
+.chn label {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  font-size: 12px;
+  color: var(--mut);
+}
+.chn .top {
+  grid-column: 1/-1;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.chn .top b {
+  flex: 1;
+}
+.acts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+button.pri {
+  background: var(--acc);
+  border-color: var(--acc);
+  color: var(--bg);
+  font-weight: 600;
+}
+#nmsg {
+  font-size: 12px;
+}

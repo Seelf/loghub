@@ -1,0 +1,96 @@
+{
+	admin off
+	auto_https off
+}
+
+# Wspolna czesc obu wejsc: logowanie, odczyt logow po zalogowaniu, sama strona.
+(app) {
+	# logowanie, 2FA, sesje
+	reverse_proxy /auth/* auth:9000 {
+		header_up X-Forwarded-Proto {args[0]}
+	}
+
+	# ludzie: tylko odczyt, przez usluge logowania, ktora sprawdza sesje
+	# i doklada filtr maszyn dla kont z ograniczonym dostepem
+	handle /select/* {
+		reverse_proxy auth:9000 {
+			flush_interval -1
+		}
+	}
+
+	# powiadomienia: podglad dla zalogowanych, ustawienia tylko dla administratora
+	handle /api/notify/* {
+		route {
+			request_header -X-User
+			request_header -X-Role
+			request_header -X-Hosts
+			forward_auth auth:9000 {
+				uri /auth/verify
+				copy_headers X-User X-Role X-Hosts
+			}
+			reverse_proxy notify:9100
+		}
+	}
+
+	# sama strona (bez danych) pokazuje formularz logowania
+	header {
+		X-Frame-Options DENY
+		X-Content-Type-Options nosniff
+		Referrer-Policy no-referrer
+		Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; frame-ancestors 'none'"
+	}
+	# strona i skrypty zawsze sprawdzane z serwerem, zeby po aktualizacji nie zostawala stara wersja w przegladarce
+	@page path / /index.html /demo.js /css/* /js/* /status/ /status/index.html
+	header @page Cache-Control "no-cache"
+	encode gzip
+	root * /srv
+	file_server
+}
+
+# Wejscie prywatne (siec lokalna i Tailscale): agenci wysylaja logi, ludzie ogladaja strone.
+:8080 {
+	@ingest_ok {
+		path /insert/*
+		header Authorization "Bearer {$INGEST_TOKEN}"
+	}
+	route {
+		reverse_proxy @ingest_ok victorialogs:9428
+		respond /insert/* 401
+		import app http
+	}
+}
+
+# Wejscie publiczne (tylko przez Tailscale Funnel, zawsze HTTPS): sama strona z logowaniem.
+# Nie ma tu przyjmowania logow ani panelu zapytan zaawansowanych.
+:8081 {
+	@closed path /insert/* /select/vmui* /delete/* /internal/*
+	route {
+		respond @closed 404
+		import app https
+	}
+}
+
+# Publiczna strona statusu (np. przez Cloudflare Tunnel na localhost:8082): tylko dwa statyczne pliki.
+# Nie ma tu zadnego polaczenia z baza logow, logowaniem ani powiadomieniami.
+:8082 {
+	header {
+		X-Frame-Options DENY
+		X-Content-Type-Options nosniff
+		Referrer-Policy no-referrer
+		Content-Security-Policy "default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; connect-src 'self'; img-src data:; base-uri 'none'; form-action 'none'; frame-ancestors 'none'"
+		-Server
+	}
+	@files {
+		method GET HEAD
+		path / /index.html /status.json
+	}
+	handle @files {
+		header /status.json Cache-Control "no-cache"
+		root * /srv/status
+		encode gzip
+		file_server
+	}
+	handle {
+		respond 404
+	}
+}

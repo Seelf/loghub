@@ -1,1906 +1,528 @@
 <!doctype html>
 <html lang="pl">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>loghub</title>
-<script>try{var t=localStorage.getItem("loghub.theme");if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
-<style>
-/* uklad: panel zrodel po lewej; po prawej przeglad (kafle, karty serwerow, tabela) albo strumien logow z naglowkiem zrodla.
-   zielen = zyje / zaznaczone, bursztyn = wyroznienie i ostrzezenia, czerwien = bledy */
-:root{--bg:#f6f7f8;--panel:#eceff1;--card:#fff;--line:#d8dfe4;--fg:#172027;--mut:#5d6b76;--acc:#0c8a5e;--acc2:#a86200;--sel:#d3eee2;--err:#b3261e;--errbg:#fceceb;--warn:#8a5a00;--warnbg:#fcf3dc;--hl:#ffe08a;
---nav:var(--acc);--r:12px;--rs:7px;
---sans:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;--mono:ui-monospace,"SF Mono","Cascadia Mono","JetBrains Mono",Menlo,Consolas,monospace}
-/* motywy: systemowy (bez atrybutu), ciemny, jasny, szklo ciemne i jasne (w stylu Apple) */
-@media(prefers-color-scheme:dark){:root:not([data-theme]){color-scheme:dark;--bg:#101315;--panel:#15191c;--card:#191e22;--line:#283037;--fg:#dde4e9;--mut:#8996a1;--acc:#3ecf9a;--acc2:#f0a747;--sel:#14372c;--err:#ff7b72;--errbg:#2a1515;--warn:#f0b85a;--warnbg:#292010;--hl:#5c4a00}}
-:root[data-theme=dark]{color-scheme:dark;--bg:#101315;--panel:#15191c;--card:#191e22;--line:#283037;--fg:#dde4e9;--mut:#8996a1;--acc:#3ecf9a;--acc2:#f0a747;--sel:#14372c;--err:#ff7b72;--errbg:#2a1515;--warn:#f0b85a;--warnbg:#292010;--hl:#5c4a00}
-:root[data-theme=glass]{color-scheme:dark;--bg:#0d0f13;--panel:rgba(28,30,36,.42);--card:rgba(44,46,54,.38);--line:rgba(255,255,255,.10);--fg:#f5f5f7;--mut:rgba(235,235,245,.62);--acc:#30d158;--acc2:#ff9f0a;--nav:#0a84ff;--chart:#0a84ff;--sel:rgba(255,255,255,.10);--err:#ff453a;--errbg:rgba(255,69,58,.16);--warn:#ff9f0a;--warnbg:rgba(255,159,10,.15);--hl:rgba(255,214,10,.32);--r:16px;--rs:9px;--field:rgba(255,255,255,.07);--btn:rgba(255,255,255,.10);--seg:rgba(40,42,50,.45);--segon:rgba(255,255,255,.16);--edge:rgba(255,255,255,.13);--spec:rgba(255,255,255,.10);--shade:rgba(0,0,0,.30);--logbg:rgba(18,19,24,.55);
---sans:-apple-system,BlinkMacSystemFont,"SF Pro Text","SF Pro","Helvetica Neue","Inter","Segoe UI",system-ui,sans-serif}
-:root[data-theme=glass-light]{color-scheme:light;--bg:#e6e9ef;--panel:rgba(255,255,255,.42);--card:rgba(255,255,255,.52);--line:rgba(60,60,67,.13);--fg:#1d1d1f;--mut:rgba(60,60,67,.66);--acc:#28a745;--acc2:#c93400;--nav:#007aff;--chart:#007aff;--sel:rgba(0,0,0,.06);--err:#ff3b30;--errbg:rgba(255,59,48,.10);--warn:#b25000;--warnbg:rgba(255,149,0,.13);--hl:rgba(255,204,0,.4);--r:16px;--rs:9px;--field:rgba(255,255,255,.6);--btn:rgba(255,255,255,.55);--seg:rgba(255,255,255,.4);--segon:rgba(255,255,255,.95);--edge:rgba(255,255,255,.75);--spec:rgba(255,255,255,.9);--shade:rgba(30,40,70,.10);--logbg:rgba(255,255,255,.55);
---sans:-apple-system,BlinkMacSystemFont,"SF Pro Text","SF Pro","Helvetica Neue","Inter","Segoe UI",system-ui,sans-serif}
-*{box-sizing:border-box}
-html,body{height:100%}
-body{margin:0;font:13px/1.45 var(--sans);background:var(--bg);color:var(--fg);accent-color:var(--nav);-webkit-font-smoothing:antialiased}
-input,select,button{font:inherit;color:inherit;background:var(--field,var(--card));border:1px solid var(--line);border-radius:var(--rs);padding:6px 10px;min-width:0}
-button{cursor:pointer}
-input,select{color:var(--fg)}
-::placeholder{color:var(--mut);opacity:.8}
-button:hover:not(:disabled){border-color:var(--mut)}
-button:disabled{opacity:.45;cursor:default}
-:focus-visible{outline:2px solid var(--nav);outline-offset:1px}
-[hidden]{display:none!important}
-a{color:var(--acc)}
-h1{font-size:22px;margin:0;font-weight:650;text-wrap:balance}
-.mut{color:var(--mut)}
-.num{font-variant-numeric:tabular-nums}
-.dot{width:8px;height:8px;border-radius:50%;background:var(--mut);opacity:.5;flex:none;display:inline-block}
-.dot.up{background:var(--acc);opacity:1}
-.dot.bad{background:var(--err);opacity:1}
-.chip{display:inline-flex;align-items:center;gap:5px;font-size:11px;padding:1px 8px;border:1px solid var(--line);border-radius:10px;color:var(--mut);white-space:nowrap}
-.chip.ok{color:var(--acc);border-color:var(--acc)}
-.chip.bad{color:var(--err);border-color:var(--err);background:var(--errbg)}
-.chip.wrn{color:var(--warn);border-color:var(--warn);background:var(--warnbg)}
-.lbl{font-size:11px;letter-spacing:.07em;text-transform:uppercase;color:var(--mut)}
-.sp{display:flex;align-items:flex-end;gap:1px;height:30px}
-.sp i{flex:1;min-height:2px;background:var(--acc);border-radius:1px}
-.sp i.z{background:var(--line)}
-.sp i.e{background:var(--err)}
-
-/* szklo: kolorowe tlo pod przezroczystymi panelami */
-:root[data-theme=glass] body{background:radial-gradient(900px 640px at 18% 8%,rgba(70,86,120,.55),transparent 70%),radial-gradient(800px 700px at 88% 30%,rgba(60,64,78,.6),transparent 70%),radial-gradient(1000px 700px at 50% 105%,rgba(52,66,96,.5),transparent 70%),var(--bg);background-attachment:fixed;letter-spacing:-.003em}
-:root[data-theme=glass-light] body{background:radial-gradient(900px 640px at 18% 8%,rgba(255,255,255,.95),transparent 70%),radial-gradient(800px 700px at 88% 30%,rgba(196,206,224,.9),transparent 70%),radial-gradient(1000px 700px at 50% 105%,rgba(214,222,236,.95),transparent 70%),var(--bg);background-attachment:fixed;letter-spacing:-.003em}
-
-[data-theme^=glass] aside,[data-theme^=glass] #head{backdrop-filter:blur(40px) saturate(180%);-webkit-backdrop-filter:blur(40px) saturate(180%)}
-[data-theme^=glass] aside{border-right:1px solid var(--edge)}
-[data-theme^=glass] .card,[data-theme^=glass] .panel,[data-theme^=glass] .tiles div,[data-theme^=glass] .ilist,[data-theme^=glass] .nlist,[data-theme^=glass] #tbl,[data-theme^=glass] #rtbl,[data-theme^=glass] #dtbl,[data-theme^=glass] #ptbl,[data-theme^=glass] #ctbl,[data-theme^=glass] #ulist,[data-theme^=glass] .pwbox,[data-theme^=glass] .stat,[data-theme^=glass] #login form,[data-theme^=glass] #pos{
-  border:1px solid var(--edge);backdrop-filter:blur(26px) saturate(180%);-webkit-backdrop-filter:blur(26px) saturate(180%);
-  box-shadow:inset 0 1px 0 var(--spec),0 8px 28px var(--shade)}
-/* zakladki plywaja nad przewijana trescia - pod nimi widac rozmycie */
-[data-theme^=glass] #tabs{position:sticky;top:-10px;z-index:5;border:1px solid var(--edge);backdrop-filter:blur(30px) saturate(180%);-webkit-backdrop-filter:blur(30px) saturate(180%);box-shadow:inset 0 1px 0 var(--spec),0 6px 20px var(--shade)}
-[data-theme^=glass] #box{backdrop-filter:blur(26px);-webkit-backdrop-filter:blur(26px)}
-[data-theme^=glass] .card.off{border-color:var(--warn)}
-[data-theme^=glass] button{background:var(--btn);border-color:transparent}
-[data-theme^=glass] button:hover:not(:disabled){border-color:transparent;filter:brightness(1.12)}
-[data-theme^=glass] .tog,[data-theme^=glass] #nav button,[data-theme^=glass] #tabs button{background:none}
-[data-theme^=glass] input,[data-theme^=glass] select{background:var(--field)}
-[data-theme^=glass] #nav button{border-left:0;padding:6px 10px}
-[data-theme^=glass] #nav button.on{background:var(--nav);color:#fff}
-[data-theme^=glass] #nav button.on .chip{color:#fff;border-color:rgba(255,255,255,.7);background:none}
-[data-theme^=glass] .it{border-left:0;margin:0 8px;padding-left:19px;border-radius:7px}
-[data-theme^=glass] .it.on{background:var(--nav);color:#fff}
-[data-theme^=glass] #tabs{display:inline-flex;align-self:flex-start;max-width:100%;border:1px solid var(--edge);background:var(--seg);border-radius:11px;padding:3px;gap:2px}
-[data-theme^=glass] #tabs button{border:0;border-radius:7px;padding:5px 14px;color:var(--fg);font-weight:500}
-[data-theme^=glass] #tabs button.on{background:var(--segon);color:var(--fg);box-shadow:0 1px 3px rgba(0,0,0,.18)}
-[data-theme^=glass] .sp i:not(.z):not(.e),[data-theme^=glass] .bar i:not(.w):not(.e),[data-theme^=glass] .vol i,[data-theme^=glass] .hist i:not(.e){background:var(--chart)}
-[data-theme^=glass] #box{background:var(--logbg)}
-[data-theme^=glass] .r b{color:var(--nav)}
-[data-theme^=glass] #live[aria-pressed=true]{background:var(--btn)}
-[data-theme^=glass] .r:hover{background:var(--sel)}
-[data-theme^=glass] button.pri,[data-theme^=glass] #lgo,[data-theme^=glass] #jump{background:var(--nav);border-color:var(--nav);color:#fff}
-[data-theme^=glass] .days button.on{outline-color:var(--nav)}
-[data-theme^=glass] .chip{border-radius:7px}
-[data-theme^=glass] h1{font-weight:700;letter-spacing:-.015em}
-@media(prefers-reduced-transparency:reduce){[data-theme^=glass] *{backdrop-filter:none!important;-webkit-backdrop-filter:none!important}}
-
-/* logowanie */
-#login{height:100%;display:flex;align-items:center;justify-content:center;padding:16px}
-#login form{width:340px;max-width:100%;background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:22px;display:flex;flex-direction:column;gap:10px}
-#login label{display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--mut)}
-#login input{padding:8px 10px;color:var(--fg)}
-#lgo{background:var(--acc);border-color:var(--acc);color:var(--bg);font-weight:600;padding:8px}
-#lerr{color:var(--err);min-height:1.4em}
-#enr{border:1px solid var(--acc2);border-radius:8px;padding:10px;display:flex;flex-direction:column;gap:6px}
-#key{font:14px var(--mono);letter-spacing:.06em;overflow-wrap:anywhere;color:var(--fg)}
-.brand{display:flex;align-items:center;gap:8px;font-size:17px;font-weight:700;letter-spacing:.01em}
-.brand i{width:14px;height:14px;border-radius:4px;background:var(--acc);box-shadow:5px 5px 0 -2px var(--acc2)}
-
-/* szkielet */
-#app{height:100%;display:flex}
-aside{width:264px;flex:none;display:flex;flex-direction:column;background:var(--panel);border-right:1px solid var(--line)}
-.nos aside{display:none}
-aside header{display:flex;align-items:center;gap:8px;padding:14px 14px 10px}
-#demo{font-size:11px;color:var(--warn);background:var(--warnbg);border:1px solid var(--warn);border-radius:9px;padding:0 7px}
-#nav{display:flex;flex-direction:column;gap:2px;padding:0 8px 8px;border-bottom:1px solid var(--line)}
-#nav button{display:flex;align-items:center;gap:8px;text-align:left;background:none;border:0;border-left:3px solid transparent;border-radius:var(--rs);padding:7px 10px}
-#nav button:hover{background:var(--sel)}
-#nav button.on{background:var(--sel);border-left-color:var(--nav);color:var(--nav);font-weight:600}
-#nav small{margin-left:auto}
-aside .lbl{padding:10px 14px 4px}
-#f{margin:0 12px 6px}
-#tree{overflow:auto;flex:1;padding-bottom:8px}
-summary{display:flex;align-items:center;gap:8px;cursor:pointer;padding:5px 14px;font-weight:600;list-style:none}
-summary::-webkit-details-marker{display:none}
-summary small,.it small{margin-left:auto;font-weight:400;color:var(--mut);font-variant-numeric:tabular-nums}
-details details{margin-left:14px;border-left:1px solid var(--line)}
-details details summary{padding-left:10px}
-.it.ghost{cursor:default;color:var(--mut)}
-.it.ghost:hover{background:none}
-.grp{padding:5px 14px 1px 30px;color:var(--mut);font-size:10px;text-transform:uppercase;letter-spacing:.07em}
-.it{display:flex;align-items:center;gap:8px;padding:3px 14px 3px 27px;cursor:pointer;white-space:nowrap;border-left:3px solid transparent}
-.it span{overflow:hidden;text-overflow:ellipsis}
-.it .chip{padding:0 6px}
-.it:hover{background:var(--sel)}
-.it.on{background:var(--sel);border-left-color:var(--nav);color:var(--nav)}
-aside footer{display:flex;flex-direction:column;gap:8px;padding:10px 12px calc(10px + env(safe-area-inset-bottom));border-top:1px solid var(--line)}
-aside footer .me{display:flex;align-items:center;gap:8px;min-width:0}
-aside footer b{overflow:hidden;text-overflow:ellipsis}
-aside footer .me button{margin-left:auto}
-aside footer label{display:flex;align-items:center;gap:8px;color:var(--mut);font-size:12px}
-aside footer select{flex:1;padding:4px 8px}
-#scrim{display:none}
-main{flex:1;min-width:0;display:flex;flex-direction:column}
-.tog{background:none;border:0;font-size:16px;padding:2px 6px;color:var(--mut)}
-
-/* przeglad */
-#over{flex:1;overflow:auto;padding:18px 22px 28px;display:flex;flex-direction:column;gap:16px}
-#over>header{display:flex;align-items:flex-start;gap:10px}
-#tabs{display:flex;gap:4px;border-bottom:1px solid var(--line);overflow-x:auto;scrollbar-width:none}
-#tabs::-webkit-scrollbar{display:none}
-#tabs button{flex:none;background:none;border:0;border-bottom:2px solid transparent;border-radius:0;padding:8px 12px;color:var(--mut)}
-#tabs button.on{color:var(--nav);border-bottom-color:var(--nav);font-weight:600}
-.tiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px}
-.tiles div{display:flex;flex-direction:column;gap:1px;background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:10px 14px;min-width:0}
-.tiles b{font-size:22px;font-weight:650;font-variant-numeric:tabular-nums}
-.tiles span{overflow:hidden;text-overflow:ellipsis}
-.tiles .go:hover{border-color:var(--mut)}
-.tiles .e b{color:var(--err)}.tiles .w b{color:var(--acc2)}.tiles .g b{color:var(--acc)}
-#cards{columns:340px;column-gap:12px}
-#cards>.card{break-inside:avoid;margin-bottom:12px}
-.card{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:14px;display:flex;flex-direction:column;gap:10px}
-.card.off{border-color:var(--warn)}
-.card header{display:flex;align-items:center;gap:8px}
-.card header b{font:600 15px var(--mono);overflow:hidden;text-overflow:ellipsis}
-.card header .chip{margin-left:auto}
-.row{display:flex;align-items:baseline;gap:8px}
-.row .num{margin-left:auto}
-.kv{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;border-top:1px solid var(--line);padding-top:10px}
-.kv div{display:flex;flex-direction:column;min-width:0}
-.kv b{font-size:16px;font-variant-numeric:tabular-nums;white-space:nowrap}
-.kv .e{color:var(--err)}.kv .w{color:var(--warn)}
-.card footer{display:flex;gap:8px;border-top:1px solid var(--line);padding-top:10px}
-.card footer button{flex:1}
-#tools{display:flex;flex-wrap:wrap;gap:8px}
-#us{flex:1 1 200px}
-#tbl{border:1px solid var(--line);border-radius:var(--r);background:var(--card);overflow-x:auto}
-.tr{display:grid;grid-template-columns:minmax(150px,2fr) minmax(70px,1fr) 78px minmax(130px,1.5fr) 64px 64px 112px;gap:12px;align-items:center;padding:7px 14px;border-bottom:1px solid var(--line);min-width:760px}
-.tr:last-child{border-bottom:0}
-.tr>*{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.tr.h{font-size:11px;letter-spacing:.07em;text-transform:uppercase;color:var(--mut)}
-.tr:not(.h){cursor:pointer}
-.tr:not(.h):hover{background:var(--sel)}
-.tr>:first-child{display:flex;align-items:center;gap:8px;font-family:var(--mono);overflow:hidden;white-space:nowrap}
-.vol{display:flex;align-items:center;gap:8px}
-.vol i{height:4px;border-radius:2px;background:var(--acc);min-width:1px}
-.vol span{font-variant-numeric:tabular-nums;width:44px;flex:none;text-align:right}
-#errs{display:flex;flex-direction:column;gap:12px}
-.itools{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
-.days{display:flex;gap:3px;overflow-x:auto;padding-bottom:2px}
-.days button{flex:1 0 24px;min-width:24px;height:46px;padding:3px 1px;display:flex;flex-direction:column;justify-content:space-between;align-items:center;font-size:10px;color:var(--mut)}
-.days button b{font-size:13px;color:var(--fg);font-variant-numeric:tabular-nums}
-.days button.l1{background:var(--warnbg);border-color:var(--warn)}.days button.l2{background:var(--errbg);border-color:var(--err)}
-.days button.l3{background:var(--err);border-color:var(--err);color:var(--bg)}.days button.l3 b{color:var(--bg)}
-.days button.on{outline:2px solid var(--acc);outline-offset:1px}
-.ilist{border:1px solid var(--line);border-radius:var(--r);background:var(--card)}
-.inc{display:grid;grid-template-columns:170px minmax(0,1fr) auto;gap:4px 14px;padding:9px 14px;border-bottom:1px solid var(--line);align-items:center}
-.inc:last-child{border-bottom:0}
-.inc .when{font-variant-numeric:tabular-nums;color:var(--mut)}
-.inc .what{display:flex;flex-wrap:wrap;gap:6px;align-items:center;min-width:0}
-.inc .what b{font-family:var(--mono);font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%}
-.inc .msgs{grid-column:2/4;font:12px/1.5 var(--mono);color:var(--mut);display:flex;flex-direction:column;gap:2px;min-width:0}
-.inc .msgs>div{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.inc .msgs button{align-self:flex-start;font:12px var(--sans);padding:1px 8px}
-.tiles .go{cursor:pointer}
-@media(max-width:700px){.inc{grid-template-columns:1fr}.inc .msgs{grid-column:auto}}
-#notv{flex:1;overflow:auto;padding:18px 22px 28px;display:flex;flex-direction:column;gap:14px}
-#notv>header{display:flex;align-items:flex-start;gap:10px}
-#notv>*,#cronv>*,#over>*{flex:none}
-.nlist{border:1px solid var(--line);border-radius:var(--r);background:var(--card);overflow:hidden}
-.al{display:flex;gap:12px;align-items:flex-start;padding:10px 14px;border-bottom:1px solid var(--line);border-left:3px solid var(--line)}
-.al:last-child{border-bottom:0}
-.al.error{border-left-color:var(--err)}.al.warn{border-left-color:var(--warn)}.al.ok{border-left-color:var(--acc)}
-.al>div{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
-.al b{font-weight:600}
-.al small{color:var(--mut)}
-.al.click{cursor:pointer}.al.click:hover{background:var(--sel)}
-.al time{color:var(--mut);font-size:12px;white-space:nowrap}
-.panel{border:1px solid var(--line);border-radius:var(--r);background:var(--card);padding:14px;display:flex;flex-direction:column;gap:12px}
-.panel h2{font-size:15px;margin:0;font-weight:600}
-.rule{display:grid;grid-template-columns:24px minmax(180px,1fr) auto;gap:10px;align-items:center}
-.rule .nums{display:flex;gap:8px;flex-wrap:wrap;align-items:center;color:var(--mut);font-size:12px}
-.rule input[type=number]{width:72px}
-.chn{border:1px solid var(--line);border-radius:10px;padding:10px;display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:8px;align-items:end}
-.chn label{display:flex;flex-direction:column;gap:3px;font-size:12px;color:var(--mut)}
-.chn .top{grid-column:1/-1;display:flex;align-items:center;gap:10px}
-.chn .top b{flex:1}
-.acts{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
-button.pri{background:var(--acc);border-color:var(--acc);color:var(--bg);font-weight:600}
-#nmsg{font-size:12px}
-#usersv,#statv,#addv{flex:1;overflow:auto;padding:18px 22px 28px;display:flex;flex-direction:column;gap:14px}
-#usersv>*,#statv>*,#addv>*{flex:none}
-#usersv>header,#statv>header,#addv>header{display:flex;align-items:flex-start;gap:10px}
-.cmd{display:flex;align-items:flex-start;gap:8px;margin:6px 0;padding:8px 8px 8px 12px;background:var(--logbg,var(--panel));border:1px solid var(--line);border-radius:var(--rs)}
-.cmd code{flex:1;min-width:0;font:12px/1.6 var(--mono);white-space:pre-wrap;word-break:break-all}
-.cmd button{flex:none;padding:3px 10px}
-.steps{margin:4px 0 0;padding-left:20px;display:flex;flex-direction:column;gap:10px}
-.steps li{padding-left:2px}
-.aopts{display:flex;flex-wrap:wrap;gap:12px 18px;align-items:flex-end}
-.aopts label{display:flex;flex-direction:column;gap:4px;color:var(--mut)}
-.aopts label.ck{flex-direction:row;align-items:center;gap:7px}
-#addv h3{margin:14px 0 2px;font-size:13px}
-.srow{display:grid;grid-template-columns:minmax(130px,1.4fr) minmax(90px,1fr) 140px 120px minmax(130px,1.4fr) 92px repeat(3,32px);gap:6px;align-items:center}
-.srow button{padding:5px 0}
-.srow .chip{justify-content:center}
-#statv code{font-family:var(--mono);font-size:12px;background:var(--panel);padding:1px 5px;border-radius:4px}
-@media(max-width:900px){.srow{grid-template-columns:repeat(6,minmax(0,1fr));padding-bottom:10px;border-bottom:1px solid var(--line)}
-  .srow>:nth-child(1){grid-column:span 6}.srow>:nth-child(2),.srow>:nth-child(3),.srow>:nth-child(4),.srow>:nth-child(5),.srow>:nth-child(6){grid-column:span 3}}
-.pwbox{border:1px solid var(--acc);border-radius:var(--r);padding:12px 14px;background:var(--card);display:flex;flex-direction:column;gap:6px}
-.pwbox .row{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
-.pwbox code{font:13px var(--mono);background:var(--panel);padding:3px 8px;border-radius:6px}
-.ufld{display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--mut)}
-.seg{display:inline-flex;background:var(--panel);border:1px solid var(--line);border-radius:var(--rs);padding:2px;gap:2px;align-self:flex-start}
-.seg button{border:0;background:none;padding:5px 14px;border-radius:calc(var(--rs) - 2px);color:var(--mut)}
-.seg button.on{background:var(--card);color:var(--fg);font-weight:600;box-shadow:0 1px 3px rgba(0,0,0,.18)}
-#uacc{display:flex;flex-direction:column;gap:10px}
-#upick{display:flex;flex-direction:column;gap:8px}
-.ptools{display:flex;gap:8px;flex-wrap:wrap}.ptools input{flex:1;min-width:200px}
-.pick{border:1px solid var(--line);border-radius:var(--rs);max-height:420px;overflow:auto;background:var(--panel)}
-.ph{display:flex;align-items:center;gap:8px;padding:6px 10px;border-bottom:1px solid var(--line)}
-.ph.kid{padding-left:34px}
-.ph label{display:flex;align-items:center;gap:8px;flex:1;min-width:0;cursor:pointer}
-.ph b{font-family:var(--mono);font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.ph .mut{font-size:12px;white-space:nowrap}
-.ph .exp{border:0;background:none;padding:2px 6px;color:var(--mut);transition:transform .15s}
-.ph .exp.open{transform:rotate(90deg)}
-.ph .exp:disabled{visibility:hidden}
-.pu{padding:4px 10px 8px 58px;border-bottom:1px solid var(--line);display:flex;flex-direction:column;gap:2px}
-.pu.kid{padding-left:82px}
-.pu .lbl{margin-top:6px}
-.pu label{display:flex;align-items:center;gap:8px;font:12px/1.6 var(--mono);cursor:pointer;min-width:0}
-.pu label span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.pu label.imp{color:var(--mut)}
-.urow{display:grid;grid-template-columns:minmax(110px,1fr) 110px minmax(180px,2.2fr) 120px 340px;gap:6px 14px;align-items:center;padding:10px 14px;border-bottom:1px solid var(--line)}
-.urow:last-child{border-bottom:0}
-.urow.h{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--mut);padding:8px 14px}
-.urow .nm{font-family:var(--mono);font-weight:500;display:flex;gap:6px;align-items:center;min-width:0}
-.urow .sc{display:flex;flex-wrap:wrap;gap:4px;min-width:0}
-.urow .sc .chip{max-width:100%;overflow:hidden;text-overflow:ellipsis}
-.urow .acts{justify-content:flex-end;flex-wrap:wrap}
-.urow .m{display:none}
-#ulist{border:1px solid var(--line);border-radius:var(--r);background:var(--card)}
-@media(max-width:900px){.urow{grid-template-columns:1fr auto}.urow.h{display:none}.urow .sc{grid-column:1/-1}.urow .acts{grid-column:1/-1;justify-content:flex-start}.urow .m{display:inline}}
-.ufrm{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px;align-items:start}
-.ufrm label{display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--mut)}
-.meters{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
-.mt{display:flex;flex-direction:column;gap:3px;min-width:0}
-.mt .row b{font-size:15px;font-variant-numeric:tabular-nums;margin-left:auto}
-.mt small{font-size:11px;color:var(--mut);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.bar{height:5px;border-radius:3px;background:var(--line);overflow:hidden}
-.bar i{display:block;height:100%;background:var(--acc)}
-.bar i.w{background:var(--warn)}.bar i.e{background:var(--err)}
-.probs{display:flex;flex-wrap:wrap;gap:5px}
-.card .chip{white-space:normal;max-width:100%;line-height:1.35;padding-top:2px;padding-bottom:2px}
-.dlist{display:flex;flex-direction:column;gap:5px;border-top:1px solid var(--line);padding-top:8px}
-.dl{display:grid;grid-template-columns:minmax(0,1fr) 56px 132px;gap:8px;align-items:center;font-size:12px}
-.dl span:first-child{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-family:var(--mono)}
-.dl .num{text-align:right;color:var(--mut);white-space:nowrap;font-size:11px}
-#dtbl,#ptbl{border:1px solid var(--line);border-radius:var(--r);background:var(--card);overflow-x:auto;margin-top:10px}
-#dtbl .tr{grid-template-columns:minmax(120px,1fr) minmax(160px,1.6fr) 90px minmax(170px,1.6fr) minmax(150px,1.3fr);min-width:800px;cursor:default}
-#ptbl .tr{grid-template-columns:minmax(120px,1fr) 60px minmax(130px,1.2fr) 70px minmax(120px,1.1fr) minmax(160px,1.3fr) minmax(130px,1fr);min-width:900px;cursor:default}
-.guests{display:flex;flex-direction:column;gap:3px;border-top:1px solid var(--line);padding-top:8px}
-.guests>div{display:grid;grid-template-columns:12px 1fr 52px 96px;gap:8px;align-items:center;font-size:12px}
-.guests span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.guests .num{text-align:right}
-#rtbl{border:1px solid var(--line);border-radius:var(--r);background:var(--card);overflow-x:auto;margin-top:10px}
-#rtbl .tr{grid-template-columns:minmax(160px,1.6fr) 90px minmax(90px,1fr) minmax(130px,1.2fr) minmax(150px,1.4fr) minmax(140px,1.4fr);min-width:820px}
-#rtbl .tr{cursor:default}
-#cronv{flex:1;overflow:auto;padding:18px 22px 28px;display:flex;flex-direction:column;gap:16px}
-#cronv>header{display:flex;align-items:flex-start;gap:10px}
-#ctools{display:flex;flex-wrap:wrap;gap:8px}
-#cs{flex:1 1 200px}
-#ctbl{border:1px solid var(--line);border-radius:var(--r);background:var(--card);overflow-x:auto}
-#ctbl .tr{grid-template-columns:118px minmax(220px,2.2fr) minmax(70px,.8fr) minmax(170px,1.3fr) 150px 44px 172px;min-width:1000px}
-#ctbl .tr>:first-child{font-family:var(--sans)}
-.job{display:flex;flex-direction:column;min-width:0}
-.job b{font:400 12px var(--mono);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.job small{color:var(--mut);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.hist{display:flex;gap:2px;align-items:center;height:16px}
-.hist i{width:6px;height:14px;border-radius:2px;background:var(--acc)}
-.hist i.e{background:var(--err)}
-
-/* logi */
-#logs{flex:1;min-height:0;display:flex;flex-direction:column}
-#head{display:flex;flex-wrap:wrap;align-items:center;gap:8px 14px;padding:9px 14px;border-bottom:1px solid var(--line);background:var(--panel)}
-#title{display:flex;align-items:center;gap:8px;min-width:0;flex:1 1 220px}
-#title b{font:600 14px var(--mono);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.stat{display:flex;align-items:center;gap:10px;border:1px solid var(--line);border-radius:8px;padding:4px 10px;background:var(--card)}
-.stat b{font-size:14px;font-variant-numeric:tabular-nums}
-.stat .sp{width:120px;height:22px}
-#live{display:flex;align-items:center;gap:7px}
-#live[aria-pressed=true]{color:var(--acc);border-color:var(--acc)}
-#live[aria-pressed=true] .dot{background:var(--acc);opacity:1;animation:pulse 1.6s infinite}
-@keyframes pulse{50%{opacity:.35}}
-@media(prefers-reduced-motion:reduce){#live .dot{animation:none!important}}
-#bar{display:flex;flex-wrap:wrap;gap:6px;padding:7px 14px;border-bottom:1px solid var(--line)}
-#q{flex:1 1 200px}
-#box{flex:1;min-height:0;position:relative}
-#log{height:100%;overflow:auto;position:relative;padding:4px 0;font:12px/1.6 var(--mono)}
-.r{display:flex;gap:9px;padding:0 14px 0 11px;border-left:3px solid transparent;white-space:pre-wrap;overflow-wrap:anywhere}
-.r:hover{background:var(--panel)}
-.r time{flex:none;color:var(--mut);font-variant-numeric:tabular-nums}
-.r .lv{flex:none;width:7px;height:7px;border-radius:50%;margin-top:.55em;background:var(--line)}
-.r b{flex:none;color:var(--acc);font-weight:400}
-.r.e{border-left-color:var(--err);background:var(--errbg)}
-.r.e .lv{background:var(--err)}.r.e span{color:var(--err)}
-.r.w{border-left-color:var(--warn);background:var(--warnbg)}
-.r.w .lv{background:var(--warn)}.r.w span{color:var(--warn)}
-mark{background:var(--hl);color:inherit;border-radius:2px}
-.n{padding:24px 14px;color:var(--mut);font-family:var(--sans)}
-#pos{position:absolute;top:10px;left:50%;transform:translateX(-50%);display:flex;align-items:center;gap:10px;background:var(--card);border:1px solid var(--line);border-radius:16px;padding:4px 14px;font-size:12px;white-space:nowrap;pointer-events:none}
-#pos u{display:block;width:120px;height:4px;border-radius:2px;background:var(--line);overflow:hidden}
-#pos u i{display:block;height:100%;background:var(--acc)}
-#jump{position:absolute;right:22px;bottom:16px;background:var(--acc);color:var(--bg);border-color:var(--acc);border-radius:8px;padding:8px 12px;font-weight:600}
-#st{display:flex;gap:12px;padding:4px 14px;border-top:1px solid var(--line);color:var(--mut);font-size:11px}
-#st a{color:inherit;margin-left:auto}
-@media(max-width:760px){
-  aside{position:fixed;top:0;bottom:0;left:0;z-index:50;width:min(86vw,320px);padding-top:env(safe-area-inset-top);box-shadow:0 0 40px rgba(0,0,0,.45);transition:transform .22s ease,visibility .22s}
-  .nos aside{display:flex;transform:translateX(-105%);visibility:hidden}
-  #scrim{display:block;position:fixed;inset:0;z-index:49;background:rgba(0,0,0,.45)}
-  .nos #scrim{display:none}
-  main{padding-top:env(safe-area-inset-top)}
-  #over,#cronv,#notv,#usersv,#statv{padding:14px 14px 24px}
-  h1{font-size:20px}
-  .tiles{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
-  .tiles b{font-size:20px}
-  .meters{gap:8px}
-  #head{padding:8px 10px;gap:6px 8px}
-  #head .stat{padding:3px 8px}
-  #bar{padding:6px 10px}
-  .r{padding:2px 10px 2px 7px;gap:0 7px;flex-wrap:wrap}
-  .r>span{flex:1 1 100%;padding-left:14px}
-  #title{flex:1 1 100%}
-  .stat .sp{display:none}
-  #q{flex:1 1 100%}
-  #bar select{flex:1 1 40%}
-  #day{flex:1 1 140px}#dfrom,#dto{flex:1 1 96px;min-width:96px}
-}
-@media(max-width:760px) and (prefers-reduced-motion:reduce){aside{transition:none}}
-@media(max-width:760px){.rule{grid-template-columns:24px 1fr}.rule .nums{grid-column:2}.kv{grid-template-columns:repeat(2,1fr)}.stat .sp{width:70px}}
-</style>
-</head>
-<body>
-
-<div id="login" hidden>
-  <form id="lf" autocomplete="on">
-    <div class="brand"><i></i>loghub</div>
-    <div class="mut" id="lhint">Zaloguj się, żeby zobaczyć logi.</div>
-    <label>Użytkownik<input id="lu" name="username" autocomplete="username" autocapitalize="none" required></label>
-    <label>Hasło<input id="lp" name="password" type="password" autocomplete="current-password" required></label>
-    <label>Kod z aplikacji (2FA)<input id="lc" name="code" inputmode="numeric" autocomplete="one-time-code" maxlength="7" placeholder="6 cyfr; przy pierwszym logowaniu zostaw puste"></label>
-    <div id="enr" hidden>
-      <b>Pierwsze logowanie: włącz 2FA</b>
-      <span>1. W aplikacji z kodami (np. Aegis, Google Authenticator) dodaj konto i wpisz ten klucz:</span>
-      <span id="key"></span>
-      <span><button type="button" id="kcopy">kopiuj klucz</button> <a id="kuri">otwórz w aplikacji na tym urządzeniu</a></span>
-      <span>2. Wpisz wyżej 6-cyfrowy kod z aplikacji i zaloguj się jeszcze raz.</span>
-    </div>
-    <div id="lerr" role="alert"></div>
-    <button id="lgo">Zaloguj</button>
-  </form>
-</div>
-
-<div id="app" hidden>
-<div id="scrim"></div>
-<aside>
-  <header><div class="brand"><i></i>loghub</div><span id="demo" hidden>demo</span></header>
-  <div id="nav">
-    <button data-go="over">Przegląd</button>
-    <button data-go="all">Wszystkie logi</button>
-    <button data-go="err">Błędy i ostrzeżenia<small class="chip bad" id="nerr" hidden></small></button>
-    <button data-go="cron">Zadania cron<small class="chip bad" id="ncron" hidden></small></button>
-    <button data-go="notif">Powiadomienia<small class="chip bad" id="nnot" hidden></small></button>
-    <button data-go="add" id="navadd" hidden>Dodaj maszynę</button>
-    <button data-go="status" id="navstat" hidden>Strona statusu</button>
-    <button data-go="users" id="navusers" hidden>Użytkownicy</button>
-  </div>
-  <div class="lbl">Serwery</div>
-  <input id="f" placeholder="filtruj źródła (Ctrl K)" aria-label="Filtruj źródła">
-  <nav id="tree" aria-label="Źródła logów"></nav>
-  <footer>
-    <div class="me"><b id="who"></b><span class="chip" id="role"></span><button id="out">Wyloguj</button></div>
-    <label>Wygląd<select id="theme" aria-label="Wygląd strony"></select></label>
-  </footer>
-</aside>
-
-<main>
-  <section id="over">
-    <header><button class="tog" data-tog title="Pokaż lub ukryj panel">☰</button><div><h1>Przegląd</h1><div class="mut" id="osub">Stan serwerów i źródeł logów z ostatnich 24 godzin.</div></div></header>
-    <div id="tiles" class="tiles"></div>
-    <div id="tabs"><button data-tab="hosts" class="on">Serwery</button><button data-tab="units">Źródła</button><button data-tab="res">Zasoby</button><button data-tab="disks">Dyski</button><button data-tab="ports">Porty</button><button data-tab="errs">Zdarzenia</button></div>
-    <div id="cards"></div>
-    <div id="units" hidden>
-      <div id="tools">
-        <input id="us" placeholder="szukaj źródła lub serwera" aria-label="Szukaj źródła">
-        <select id="usort" aria-label="Sortuj według"><option value="inc">zdarzenia 24 h</option><option value="c24">linie 24 h</option><option value="last">ostatni log</option><option value="unit">nazwa</option></select>
-        <select id="udir" aria-label="Kolejność"><option value="-1">malejąco</option><option value="1">rosnąco</option></select>
-      </div>
-      <div id="tbl" style="margin-top:10px"></div>
-    </div>
-    <div id="errs" hidden>
-      <div class="itools">
-        <select id="ir" aria-label="Okres"><option value="1d">ostatnie 24 godz.</option><option value="7d">7 dni</option><option value="30d">30 dni</option><option value="90d">90 dni</option></select>
-        <select id="ih" aria-label="Serwer"><option value="">wszystkie serwery</option></select>
-        <span class="mut" id="imsg"></span>
-      </div>
-      <div id="idays" class="days"></div>
-      <div id="ilist" class="ilist"></div>
-      <div id="inoise" style="display:flex;flex-direction:column;gap:8px"></div>
-    </div>
-    <div id="resv" hidden>
-      <div id="rtools" style="display:flex;flex-wrap:wrap;gap:8px">
-        <input id="rs" placeholder="szukaj maszyny, kontenera lub usługi" aria-label="Szukaj" style="flex:1 1 200px">
-        <select id="rsort" aria-label="Sortuj według"><option value="cpu">CPU</option><option value="ram">RAM</option><option value="name">nazwa</option></select>
-        <select id="rtype" aria-label="Rodzaj"><option value="">wszystko</option><option value="host">maszyny</option><option value="ct">kontenery Docker</option><option value="guest">LXC i VM (Proxmox)</option></select>
-      </div>
-      <div id="rtbl"></div>
-    </div>
-    <div id="diskv" hidden>
-      <div class="mut">Wszystkie zamontowane dyski i udziały oraz stan fizycznych dysków (SMART, sprawdzany co 10 min na maszynach fizycznych) i pul ZFS.</div>
-      <div id="dtbl"></div>
-    </div>
-    <div id="portv" hidden>
-      <div style="display:flex;flex-wrap:wrap;gap:8px">
-        <input id="ps" placeholder="szukaj portu, procesu lub maszyny" aria-label="Szukaj portu" style="flex:1 1 200px">
-        <select id="pscope" aria-label="Zakres"><option value="">wszystkie</option><option value="all">otwarte na wszystkich interfejsach</option><option value="lan">sieć lokalna</option><option value="ts">Tailscale</option><option value="local">tylko lokalnie</option></select>
-        <select id="pproto" aria-label="Protokół"><option value="">TCP i UDP</option><option value="tcp">TCP</option><option value="udp">UDP</option></select>
-      </div>
-      <div id="ptbl"></div>
-    </div>
-  </section>
-
-  <section id="cronv" hidden>
-    <header><button class="tog" data-tog title="Pokaż lub ukryj panel">☰</button><div><h1 id="ctitle">Zadania cron</h1><div class="mut" id="csub">Ostatnie uruchomienia, kody wyjścia i harmonogramy ze wszystkich maszyn.</div></div></header>
-    <div id="ctiles" class="tiles"></div>
-    <div id="ctools">
-      <input id="cs" placeholder="szukaj zadania lub serwera" aria-label="Szukaj zadania">
-      <select id="cf" aria-label="Pokaż"><option value="">wszystkie zadania</option><option value="bad">tylko z błędem</option><option value="never">jeszcze nie uruchomione</option></select>
-    </div>
-    <div id="ctbl"></div>
-  </section>
-
-  <section id="notv" hidden>
-    <header><button class="tog" data-tog title="Pokaż lub ukryj panel">☰</button><div><h1>Powiadomienia</h1><div class="mut" id="nsub">Centrala sprawdza stan maszyn co minutę i wysyła powiadomienia na ustawione kanały.</div></div></header>
-    <div class="lbl">Aktywne problemy</div>
-    <div id="nact" class="nlist"></div>
-    <div id="nset" hidden>
-      <div class="panel">
-        <h2>Kiedy powiadamiać</h2>
-        <div id="nrules" style="display:flex;flex-direction:column;gap:8px"></div>
-        <div class="acts">
-          <label><input type="checkbox" id="nres"> powiadom też, gdy problem minie</label>
-          <label>przypominaj co <input type="number" id="nrep" min="0" max="168" style="width:64px"> godz. (0 = nie)</label>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+    <title>loghub</title>
+    <script>
+      try {
+        var t = localStorage.getItem('loghub.theme');
+        if (t) document.documentElement.dataset.theme = t;
+      } catch (e) {}
+    </script>
+    <link rel="stylesheet" href="css/base.css" />
+    <link rel="stylesheet" href="css/glass.css" />
+    <link rel="stylesheet" href="css/login.css" />
+    <link rel="stylesheet" href="css/layout.css" />
+    <link rel="stylesheet" href="css/overview.css" />
+    <link rel="stylesheet" href="css/notify.css" />
+    <link rel="stylesheet" href="css/pages.css" />
+    <link rel="stylesheet" href="css/users.css" />
+    <link rel="stylesheet" href="css/resources.css" />
+    <link rel="stylesheet" href="css/cron.css" />
+    <link rel="stylesheet" href="css/logs.css" />
+    <link rel="stylesheet" href="css/mobile.css" />
+  </head>
+  <body>
+    <div id="login" hidden>
+      <form id="lf" autocomplete="on">
+        <div class="brand"><i></i>loghub</div>
+        <div class="mut" id="lhint">Zaloguj się, żeby zobaczyć logi.</div>
+        <label
+          >Użytkownik<input id="lu" name="username" autocomplete="username" autocapitalize="none" required
+        /></label>
+        <label
+          >Hasło<input id="lp" name="password" type="password" autocomplete="current-password" required
+        /></label>
+        <label
+          >Kod z aplikacji (2FA)<input
+            id="lc"
+            name="code"
+            inputmode="numeric"
+            autocomplete="one-time-code"
+            maxlength="7"
+            placeholder="6 cyfr; przy pierwszym logowaniu zostaw puste"
+        /></label>
+        <div id="enr" hidden>
+          <b>Pierwsze logowanie: włącz 2FA</b>
+          <span
+            >1. W aplikacji z kodami (np. Aegis, Google Authenticator) dodaj konto i wpisz ten klucz:</span
+          >
+          <span id="key"></span>
+          <span
+            ><button type="button" id="kcopy">kopiuj klucz</button>
+            <a id="kuri">otwórz w aplikacji na tym urządzeniu</a></span
+          >
+          <span>2. Wpisz wyżej 6-cyfrowy kod z aplikacji i zaloguj się jeszcze raz.</span>
         </div>
-      </div>
-      <div class="panel" style="margin-top:12px">
-        <h2>Gdzie wysyłać</h2>
-        <div id="nchs" style="display:flex;flex-direction:column;gap:10px"></div>
-        <div class="acts">
-          <select id="nadd" aria-label="Dodaj kanał"><option value="">+ dodaj kanał…</option><option value="ntfy">ntfy (aplikacja na telefon)</option><option value="telegram">Telegram</option><option value="discord">Discord</option><option value="webhook">Webhook</option><option value="email">E-mail</option></select>
+        <div id="lerr" role="alert"></div>
+        <button id="lgo">Zaloguj</button>
+      </form>
+    </div>
+
+    <div id="app" hidden>
+      <div id="scrim"></div>
+      <aside>
+        <header>
+          <div class="brand"><i></i>loghub</div>
+          <span id="demo" hidden>demo</span>
+        </header>
+        <div id="nav">
+          <button data-go="over">Przegląd</button>
+          <button data-go="all">Wszystkie logi</button>
+          <button data-go="err">Błędy i ostrzeżenia<small class="chip bad" id="nerr" hidden></small></button>
+          <button data-go="cron">Zadania cron<small class="chip bad" id="ncron" hidden></small></button>
+          <button data-go="notif">Powiadomienia<small class="chip bad" id="nnot" hidden></small></button>
+          <button data-go="add" id="navadd" hidden>Dodaj maszynę</button>
+          <button data-go="status" id="navstat" hidden>Strona statusu</button>
+          <button data-go="users" id="navusers" hidden>Użytkownicy</button>
         </div>
-      </div>
-      <div class="acts" style="margin-top:12px">
-        <button class="pri" id="nsave">Zapisz ustawienia</button>
-        <button id="ntest">Wyślij wiadomość testową</button>
-        <span id="nmsg" role="status"></span>
-      </div>
+        <div class="lbl">Serwery</div>
+        <input id="f" placeholder="filtruj źródła (Ctrl K)" aria-label="Filtruj źródła" />
+        <nav id="tree" aria-label="Źródła logów"></nav>
+        <footer>
+          <div class="me">
+            <b id="who"></b><span class="chip" id="role"></span><button id="out">Wyloguj</button>
+          </div>
+          <label>Wygląd<select id="theme" aria-label="Wygląd strony"></select></label>
+        </footer>
+      </aside>
+
+      <main>
+        <section id="over">
+          <header>
+            <button class="tog" data-tog title="Pokaż lub ukryj panel">☰</button>
+            <div>
+              <h1>Przegląd</h1>
+              <div class="mut" id="osub">Stan serwerów i źródeł logów z ostatnich 24 godzin.</div>
+            </div>
+          </header>
+          <div id="tiles" class="tiles"></div>
+          <div id="tabs">
+            <button data-tab="hosts" class="on">Serwery</button><button data-tab="units">Źródła</button
+            ><button data-tab="res">Zasoby</button><button data-tab="disks">Dyski</button
+            ><button data-tab="ports">Porty</button><button data-tab="errs">Zdarzenia</button>
+          </div>
+          <div id="cards"></div>
+          <div id="units" hidden>
+            <div id="tools">
+              <input id="us" placeholder="szukaj źródła lub serwera" aria-label="Szukaj źródła" />
+              <select id="usort" aria-label="Sortuj według">
+                <option value="inc">zdarzenia 24 h</option>
+                <option value="c24">linie 24 h</option>
+                <option value="last">ostatni log</option>
+                <option value="unit">nazwa</option>
+              </select>
+              <select id="udir" aria-label="Kolejność">
+                <option value="-1">malejąco</option>
+                <option value="1">rosnąco</option>
+              </select>
+            </div>
+            <div id="tbl" style="margin-top: 10px"></div>
+          </div>
+          <div id="errs" hidden>
+            <div class="itools">
+              <select id="ir" aria-label="Okres">
+                <option value="1d">ostatnie 24 godz.</option>
+                <option value="7d">7 dni</option>
+                <option value="30d">30 dni</option>
+                <option value="90d">90 dni</option>
+              </select>
+              <select id="ih" aria-label="Serwer">
+                <option value="">wszystkie serwery</option>
+              </select>
+              <span class="mut" id="imsg"></span>
+            </div>
+            <div id="idays" class="days"></div>
+            <div id="ilist" class="ilist"></div>
+            <div id="inoise" style="display: flex; flex-direction: column; gap: 8px"></div>
+          </div>
+          <div id="resv" hidden>
+            <div id="rtools" style="display: flex; flex-wrap: wrap; gap: 8px">
+              <input
+                id="rs"
+                placeholder="szukaj maszyny, kontenera lub usługi"
+                aria-label="Szukaj"
+                style="flex: 1 1 200px"
+              />
+              <select id="rsort" aria-label="Sortuj według">
+                <option value="cpu">CPU</option>
+                <option value="ram">RAM</option>
+                <option value="name">nazwa</option>
+              </select>
+              <select id="rtype" aria-label="Rodzaj">
+                <option value="">wszystko</option>
+                <option value="host">maszyny</option>
+                <option value="ct">kontenery Docker</option>
+                <option value="guest">LXC i VM (Proxmox)</option>
+              </select>
+            </div>
+            <div id="rtbl"></div>
+          </div>
+          <div id="diskv" hidden>
+            <div class="mut">
+              Wszystkie zamontowane dyski i udziały oraz stan fizycznych dysków (SMART, sprawdzany co 10 min
+              na maszynach fizycznych) i pul ZFS.
+            </div>
+            <div id="dtbl"></div>
+          </div>
+          <div id="portv" hidden>
+            <div style="display: flex; flex-wrap: wrap; gap: 8px">
+              <input
+                id="ps"
+                placeholder="szukaj portu, procesu lub maszyny"
+                aria-label="Szukaj portu"
+                style="flex: 1 1 200px"
+              />
+              <select id="pscope" aria-label="Zakres">
+                <option value="">wszystkie</option>
+                <option value="all">otwarte na wszystkich interfejsach</option>
+                <option value="lan">sieć lokalna</option>
+                <option value="ts">Tailscale</option>
+                <option value="local">tylko lokalnie</option>
+              </select>
+              <select id="pproto" aria-label="Protokół">
+                <option value="">TCP i UDP</option>
+                <option value="tcp">TCP</option>
+                <option value="udp">UDP</option>
+              </select>
+            </div>
+            <div id="ptbl"></div>
+          </div>
+        </section>
+
+        <section id="cronv" hidden>
+          <header>
+            <button class="tog" data-tog title="Pokaż lub ukryj panel">☰</button>
+            <div>
+              <h1 id="ctitle">Zadania cron</h1>
+              <div class="mut" id="csub">
+                Ostatnie uruchomienia, kody wyjścia i harmonogramy ze wszystkich maszyn.
+              </div>
+            </div>
+          </header>
+          <div id="ctiles" class="tiles"></div>
+          <div id="ctools">
+            <input id="cs" placeholder="szukaj zadania lub serwera" aria-label="Szukaj zadania" />
+            <select id="cf" aria-label="Pokaż">
+              <option value="">wszystkie zadania</option>
+              <option value="bad">tylko z błędem</option>
+              <option value="never">jeszcze nie uruchomione</option>
+            </select>
+          </div>
+          <div id="ctbl"></div>
+        </section>
+
+        <section id="notv" hidden>
+          <header>
+            <button class="tog" data-tog title="Pokaż lub ukryj panel">☰</button>
+            <div>
+              <h1>Powiadomienia</h1>
+              <div class="mut" id="nsub">
+                Centrala sprawdza stan maszyn co minutę i wysyła powiadomienia na ustawione kanały.
+              </div>
+            </div>
+          </header>
+          <div class="lbl">Aktywne problemy</div>
+          <div id="nact" class="nlist"></div>
+          <div id="nset" hidden>
+            <div class="panel">
+              <h2>Kiedy powiadamiać</h2>
+              <div id="nrules" style="display: flex; flex-direction: column; gap: 8px"></div>
+              <div class="acts">
+                <label><input type="checkbox" id="nres" /> powiadom też, gdy problem minie</label>
+                <label
+                  >przypominaj co
+                  <input type="number" id="nrep" min="0" max="168" style="width: 64px" /> godz. (0 =
+                  nie)</label
+                >
+              </div>
+            </div>
+            <div class="panel" style="margin-top: 12px">
+              <h2>Gdzie wysyłać</h2>
+              <div id="nchs" style="display: flex; flex-direction: column; gap: 10px"></div>
+              <div class="acts">
+                <select id="nadd" aria-label="Dodaj kanał">
+                  <option value="">+ dodaj kanał…</option>
+                  <option value="ntfy">ntfy (aplikacja na telefon)</option>
+                  <option value="telegram">Telegram</option>
+                  <option value="discord">Discord</option>
+                  <option value="webhook">Webhook</option>
+                  <option value="email">E-mail</option>
+                </select>
+              </div>
+            </div>
+            <div class="acts" style="margin-top: 12px">
+              <button class="pri" id="nsave">Zapisz ustawienia</button>
+              <button id="ntest">Wyślij wiadomość testową</button>
+              <span id="nmsg" role="status"></span>
+            </div>
+          </div>
+          <div class="lbl">Historia</div>
+          <div id="nhist" class="nlist"></div>
+        </section>
+
+        <section id="addv" hidden>
+          <header>
+            <button class="tog" data-tog title="Pokaż lub ukryj panel">☰</button>
+            <div>
+              <h1>Dodaj maszynę</h1>
+              <div class="mut">
+                Gotowe komendy z adresem centrali i tokenem. Jedna komenda na maszynę. Uruchomiona ponownie
+                aktualizuje agenta; konta, 2FA i ustawienia zostają.
+              </div>
+            </div>
+          </header>
+          <div class="panel">
+            <div class="aopts">
+              <label
+                >Nazwa maszyny w panelu<input id="aname" maxlength="60" placeholder="domyślnie nazwa hosta"
+              /></label>
+              <label class="ck"
+                ><input type="checkbox" id="asudo" />dodaj sudo (konto bez roota, np. Ubuntu)</label
+              >
+            </div>
+            <span id="amsg" class="mut" role="status"></span>
+          </div>
+          <div class="panel">
+            <h2>Serwer z Linuksem w domowej sieci</h2>
+            <div class="mut">
+              Debian, Ubuntu, Raspberry Pi OS, pojedynczy LXC albo VM. Logi idą po sieci lokalnej, bez
+              Tailscale.
+            </div>
+            <div class="cmd" data-k="lan"></div>
+          </div>
+          <div class="panel" id="avps">
+            <h2>VPS albo serwer poza domem</h2>
+            <div class="mut">
+              Logi idą przez Tailscale. Jeśli Tailscale jest już zalogowany na tej maszynie, instalator go nie
+              rusza. Jeśli go nie ma, zainstaluje go i wypisze link do zalogowania.
+            </div>
+            <div class="cmd" data-k="vps"></div>
+          </div>
+          <div class="panel">
+            <h2>Host Proxmox: host, wszystkie LXC i VM naraz</h2>
+            <div class="mut">
+              Uruchom na hoście jako root. Agent stanie na hoście, w każdym działającym LXC i w VM z QEMU
+              Guest Agentem; VM i LXC pojawią się w drzewie pod hostem. Ta sama komenda później wszystko
+              aktualizuje.
+            </div>
+            <div class="cmd" data-k="pve"></div>
+            <h3>VM bez guest agenta</h3>
+            <ol class="steps">
+              <li>
+                W środku VM zainstaluj agenta QEMU:
+                <div class="cmd" data-k="gavm"></div>
+              </li>
+              <li>
+                Na hoście włącz go w ustawieniach VM i uruchom ją od nowa (zamiast ID wpisz numer VM). Restart
+                z wnętrza VM nie wystarczy, musi być wyłączenie i włączenie:
+                <div class="cmd" data-k="gahost"></div>
+              </li>
+              <li>
+                Sprawdź, czy odpowiada, a potem uruchom jeszcze raz komendę dla Proxmoxa:
+                <div class="cmd" data-k="gachk"></div>
+              </li>
+            </ol>
+          </div>
+          <div class="panel">
+            <h2>Home Assistant OS</h2>
+            <ol class="steps">
+              <li>
+                W Home Assistant: Ustawienia → Dodatki → Sklep z dodatkami → menu ⋮ → Repozytoria. Dodaj
+                adres:
+                <div class="cmd" data-k="harepo"></div>
+              </li>
+              <li>
+                Odśwież sklep i zainstaluj <b>loghub agent</b>. Pierwsza instalacja trwa kilka minut, bo Home
+                Assistant buduje dodatek u siebie.
+              </li>
+              <li>
+                W zakładce Konfiguracja wpisz:<br />hub
+                <div class="cmd" data-k="hahub"></div>
+                token
+                <div class="cmd" data-k="hatok"></div>
+                name (najlepiej nazwa tej VM w Proxmoxie)
+                <div class="cmd" data-k="haname"></div>
+              </li>
+              <li>Uruchom dodatek. W zakładce Dziennik powinna pojawić się linia „wysylam do …”.</li>
+            </ol>
+          </div>
+          <div class="panel">
+            <h2>Usunięcie agenta z maszyny</h2>
+            <div class="cmd" data-k="del"></div>
+            <div class="mut">Logi zebrane wcześniej zostają w centrali.</div>
+          </div>
+        </section>
+        <section id="statv" hidden>
+          <header>
+            <button class="tog" data-tog title="Pokaż lub ukryj panel">☰</button>
+            <div>
+              <h1>Strona statusu</h1>
+              <div class="mut">
+                Publiczna strona ze stanem wybranych usług i paskami dostępności z 90 dni. Nie pokazuje nazw
+                maszyn, adresów ani logów: tylko nazwy, które tu wpiszesz.
+              </div>
+            </div>
+          </header>
+          <div class="panel">
+            <h2>Usługi na stronie</h2>
+            <label class="mut" style="display: flex; flex-direction: column; gap: 4px; max-width: 420px"
+              >Tytuł strony<input id="stitle" maxlength="80" placeholder="Status usług"
+            /></label>
+            <div id="scomps" style="display: flex; flex-direction: column; gap: 8px"></div>
+            <div class="acts"><button id="sadd">+ dodaj usługę</button></div>
+          </div>
+          <div class="acts">
+            <button class="pri" id="ssave">Zapisz</button
+            ><a id="sprev" href="/status/" target="_blank" rel="noopener">otwórz podgląd strony</a
+            ><span id="smsg" role="status"></span>
+          </div>
+          <div class="panel">
+            <h2>Własna domena (np. status.konarczak.pl)</h2>
+            <div class="mut">
+              Centrala wystawia stronę statusu na porcie <code>8082</code>, dostępnym tylko z samej centrali.
+              W tunelu Cloudflare (Zero Trust → Networks → Tunnels → Twój tunel → Public Hostname) dodaj
+              adres, np. <code>status</code> + Twoja domena, typ <code>HTTP</code>, URL
+              <code>localhost:8082</code>. Pod tym portem są tylko dwa pliki: strona i
+              <code>status.json</code>. Nie ma tam logowania, logów ani żadnego połączenia z bazą, więc nie
+              potrzeba Cloudflare Access.
+            </div>
+          </div>
+        </section>
+        <section id="usersv" hidden>
+          <header>
+            <button class="tog" data-tog title="Pokaż lub ukryj panel">☰</button>
+            <div style="flex: 1">
+              <h1>Użytkownicy</h1>
+              <div class="mut">
+                Każde konto loguje się hasłem i kodem 2FA (włączanym przy pierwszym logowaniu). Oglądający
+                widzi tylko to, co mu zaznaczysz: całe maszyny albo pojedyncze źródła logów, np. sam TeamSpeak
+                z VPS.
+              </div>
+            </div>
+            <button class="pri" id="unew">+ Nowe konto</button>
+          </header>
+          <div id="upw" class="pwbox" hidden></div>
+          <div class="panel" id="ued" hidden>
+            <h2 id="ufh">Nowe konto</h2>
+            <div class="ufrm">
+              <label
+                >Nazwa użytkownika<input id="un" autocomplete="off" placeholder="np. kamil" maxlength="32"
+              /></label>
+              <div class="ufld">
+                <span>Rola</span>
+                <div class="seg" id="urole">
+                  <button data-v="viewer">Oglądający</button><button data-v="admin">Administrator</button>
+                </div>
+              </div>
+            </div>
+            <div class="mut" id="uroleh"></div>
+            <div id="uacc">
+              <div class="ufld">
+                <span>Co widzi</span>
+                <div class="seg" id="uscope">
+                  <button data-v="sel">Tylko wybrane</button><button data-v="all">Wszystko</button>
+                </div>
+              </div>
+              <div id="upick">
+                <div class="ptools">
+                  <input
+                    id="uq"
+                    placeholder="szukaj maszyny albo źródła, np. teamspeak"
+                    aria-label="Szukaj"
+                  /><button id="uexp">rozwiń wszystko</button><button id="uclr">wyczyść</button>
+                </div>
+                <div class="pick" id="uhp"></div>
+                <div class="mut" id="usum"></div>
+              </div>
+              <div class="mut" id="uallh" hidden>
+                Widzi wszystkie maszyny i źródła, także te dodane później. Nie może zarządzać kontami ani
+                ustawieniami.
+              </div>
+            </div>
+            <div class="acts">
+              <button class="pri" id="usave">Dodaj konto</button><button id="ucancel">Anuluj</button
+              ><span id="umsg" role="status"></span>
+            </div>
+          </div>
+          <div id="ulist"></div>
+        </section>
+
+        <section id="logs" hidden>
+          <div id="head">
+            <button class="tog" data-tog title="Pokaż lub ukryj panel">☰</button>
+            <div id="title"></div>
+            <div class="stat">
+              <div>
+                <div class="lbl">Linie / min</div>
+                <b id="rate">–</b>
+              </div>
+              <div class="sp" id="rsp"></div>
+            </div>
+            <div class="stat">
+              <div>
+                <div class="lbl">Zdarzenia 24 h</div>
+                <b id="e24">–</b>
+              </div>
+            </div>
+            <div class="stat" id="resbox" hidden>
+              <div>
+                <div class="lbl" id="reslbl">Zasoby</div>
+                <b id="resval">–</b>
+              </div>
+            </div>
+            <button id="live" aria-pressed="true"><i class="dot"></i><span>Na żywo</span></button>
+          </div>
+          <div id="bar">
+            <input id="q" placeholder="szukaj w logach ( / )" aria-label="Szukaj w logach" />
+            <select id="lvl" aria-label="Poziom">
+              <option value="">wszystkie poziomy</option>
+              <option value="w">ostrzeżenia i błędy</option>
+              <option value="e">tylko błędy</option>
+            </select>
+            <select id="range" aria-label="Zakres czasu">
+              <option value="15m">15 min</option>
+              <option value="1h" selected>1 godz.</option>
+              <option value="6h">6 godz.</option>
+              <option value="1d">1 dzień</option>
+              <option value="7d">7 dni</option>
+              <option value="30d">30 dni</option>
+              <option value="100d">100 dni</option>
+              <option value="day">wybrany dzień…</option>
+            </select>
+            <input type="date" id="day" aria-label="Dzień" hidden />
+            <input type="time" id="dfrom" aria-label="Od godziny" value="00:00" hidden />
+            <input type="time" id="dto" aria-label="Do godziny" value="23:59" hidden />
+          </div>
+          <div id="box">
+            <div id="log"></div>
+            <div id="pos" hidden>
+              <span></span><u><i></i></u><span class="num"></span>
+            </div>
+            <button id="jump" hidden></button>
+          </div>
+          <div id="st">
+            <span id="msg"></span><span id="cnt"></span
+            ><a id="adv" href="/select/vmui/">zapytania zaawansowane</a>
+          </div>
+        </section>
+      </main>
     </div>
-    <div class="lbl">Historia</div>
-    <div id="nhist" class="nlist"></div>
-  </section>
 
-  <section id="addv" hidden>
-    <header><button class="tog" data-tog title="Pokaż lub ukryj panel">☰</button><div><h1>Dodaj maszynę</h1><div class="mut">Gotowe komendy z adresem centrali i tokenem. Jedna komenda na maszynę. Uruchomiona ponownie aktualizuje agenta; konta, 2FA i ustawienia zostają.</div></div></header>
-    <div class="panel">
-      <div class="aopts">
-        <label>Nazwa maszyny w panelu<input id="aname" maxlength="60" placeholder="domyślnie nazwa hosta"></label>
-        <label class="ck"><input type="checkbox" id="asudo">dodaj sudo (konto bez roota, np. Ubuntu)</label>
-      </div>
-      <span id="amsg" class="mut" role="status"></span>
-    </div>
-    <div class="panel">
-      <h2>Serwer z Linuksem w domowej sieci</h2>
-      <div class="mut">Debian, Ubuntu, Raspberry Pi OS, pojedynczy LXC albo VM. Logi idą po sieci lokalnej, bez Tailscale.</div>
-      <div class="cmd" data-k="lan"></div>
-    </div>
-    <div class="panel" id="avps">
-      <h2>VPS albo serwer poza domem</h2>
-      <div class="mut">Logi idą przez Tailscale. Jeśli Tailscale jest już zalogowany na tej maszynie, instalator go nie rusza. Jeśli go nie ma, zainstaluje go i wypisze link do zalogowania.</div>
-      <div class="cmd" data-k="vps"></div>
-    </div>
-    <div class="panel">
-      <h2>Host Proxmox: host, wszystkie LXC i VM naraz</h2>
-      <div class="mut">Uruchom na hoście jako root. Agent stanie na hoście, w każdym działającym LXC i w VM z QEMU Guest Agentem; VM i LXC pojawią się w drzewie pod hostem. Ta sama komenda później wszystko aktualizuje.</div>
-      <div class="cmd" data-k="pve"></div>
-      <h3>VM bez guest agenta</h3>
-      <ol class="steps">
-        <li>W środku VM zainstaluj agenta QEMU:<div class="cmd" data-k="gavm"></div></li>
-        <li>Na hoście włącz go w ustawieniach VM i uruchom ją od nowa (zamiast ID wpisz numer VM). Restart z wnętrza VM nie wystarczy, musi być wyłączenie i włączenie:<div class="cmd" data-k="gahost"></div></li>
-        <li>Sprawdź, czy odpowiada, a potem uruchom jeszcze raz komendę dla Proxmoxa:<div class="cmd" data-k="gachk"></div></li>
-      </ol>
-    </div>
-    <div class="panel">
-      <h2>Home Assistant OS</h2>
-      <ol class="steps">
-        <li>W Home Assistant: Ustawienia → Dodatki → Sklep z dodatkami → menu ⋮ → Repozytoria. Dodaj adres:<div class="cmd" data-k="harepo"></div></li>
-        <li>Odśwież sklep i zainstaluj <b>loghub agent</b>. Pierwsza instalacja trwa kilka minut, bo Home Assistant buduje dodatek u siebie.</li>
-        <li>W zakładce Konfiguracja wpisz:<br>hub<div class="cmd" data-k="hahub"></div>token<div class="cmd" data-k="hatok"></div>name (najlepiej nazwa tej VM w Proxmoxie)<div class="cmd" data-k="haname"></div></li>
-        <li>Uruchom dodatek. W zakładce Dziennik powinna pojawić się linia „wysylam do …”.</li>
-      </ol>
-    </div>
-    <div class="panel">
-      <h2>Usunięcie agenta z maszyny</h2>
-      <div class="cmd" data-k="del"></div>
-      <div class="mut">Logi zebrane wcześniej zostają w centrali.</div>
-    </div>
-  </section>
-  <section id="statv" hidden>
-    <header><button class="tog" data-tog title="Pokaż lub ukryj panel">☰</button><div><h1>Strona statusu</h1><div class="mut">Publiczna strona ze stanem wybranych usług i paskami dostępności z 90 dni. Nie pokazuje nazw maszyn, adresów ani logów: tylko nazwy, które tu wpiszesz.</div></div></header>
-    <div class="panel">
-      <h2>Usługi na stronie</h2>
-      <label class="mut" style="display:flex;flex-direction:column;gap:4px;max-width:420px">Tytuł strony<input id="stitle" maxlength="80" placeholder="Status usług"></label>
-      <div id="scomps" style="display:flex;flex-direction:column;gap:8px"></div>
-      <div class="acts"><button id="sadd">+ dodaj usługę</button></div>
-    </div>
-    <div class="acts"><button class="pri" id="ssave">Zapisz</button><a id="sprev" href="/status/" target="_blank" rel="noopener">otwórz podgląd strony</a><span id="smsg" role="status"></span></div>
-    <div class="panel">
-      <h2>Własna domena (np. status.konarczak.pl)</h2>
-      <div class="mut">Centrala wystawia stronę statusu na porcie <code>8082</code>, dostępnym tylko z samej centrali. W tunelu Cloudflare (Zero Trust → Networks → Tunnels → Twój tunel → Public Hostname) dodaj adres, np. <code>status</code> + Twoja domena, typ <code>HTTP</code>, URL <code>localhost:8082</code>. Pod tym portem są tylko dwa pliki: strona i <code>status.json</code>. Nie ma tam logowania, logów ani żadnego połączenia z bazą, więc nie potrzeba Cloudflare Access.</div>
-    </div>
-  </section>
-  <section id="usersv" hidden>
-    <header><button class="tog" data-tog title="Pokaż lub ukryj panel">☰</button><div style="flex:1"><h1>Użytkownicy</h1><div class="mut">Każde konto loguje się hasłem i kodem 2FA (włączanym przy pierwszym logowaniu). Oglądający widzi tylko to, co mu zaznaczysz: całe maszyny albo pojedyncze źródła logów, np. sam TeamSpeak z VPS.</div></div><button class="pri" id="unew">+ Nowe konto</button></header>
-    <div id="upw" class="pwbox" hidden></div>
-    <div class="panel" id="ued" hidden>
-      <h2 id="ufh">Nowe konto</h2>
-      <div class="ufrm">
-        <label>Nazwa użytkownika<input id="un" autocomplete="off" placeholder="np. kamil" maxlength="32"></label>
-        <div class="ufld"><span>Rola</span><div class="seg" id="urole"><button data-v="viewer">Oglądający</button><button data-v="admin">Administrator</button></div></div>
-      </div>
-      <div class="mut" id="uroleh"></div>
-      <div id="uacc">
-        <div class="ufld"><span>Co widzi</span><div class="seg" id="uscope"><button data-v="sel">Tylko wybrane</button><button data-v="all">Wszystko</button></div></div>
-        <div id="upick">
-          <div class="ptools"><input id="uq" placeholder="szukaj maszyny albo źródła, np. teamspeak" aria-label="Szukaj"><button id="uexp">rozwiń wszystko</button><button id="uclr">wyczyść</button></div>
-          <div class="pick" id="uhp"></div>
-          <div class="mut" id="usum"></div>
-        </div>
-        <div class="mut" id="uallh" hidden>Widzi wszystkie maszyny i źródła, także te dodane później. Nie może zarządzać kontami ani ustawieniami.</div>
-      </div>
-      <div class="acts"><button class="pri" id="usave">Dodaj konto</button><button id="ucancel">Anuluj</button><span id="umsg" role="status"></span></div>
-    </div>
-    <div id="ulist"></div>
-  </section>
-
-  <section id="logs" hidden>
-    <div id="head">
-      <button class="tog" data-tog title="Pokaż lub ukryj panel">☰</button>
-      <div id="title"></div>
-      <div class="stat"><div><div class="lbl">Linie / min</div><b id="rate">–</b></div><div class="sp" id="rsp"></div></div>
-      <div class="stat"><div><div class="lbl">Zdarzenia 24 h</div><b id="e24">–</b></div></div>
-      <div class="stat" id="resbox" hidden><div><div class="lbl" id="reslbl">Zasoby</div><b id="resval">–</b></div></div>
-      <button id="live" aria-pressed="true"><i class="dot"></i><span>Na żywo</span></button>
-    </div>
-    <div id="bar">
-      <input id="q" placeholder="szukaj w logach ( / )" aria-label="Szukaj w logach">
-      <select id="lvl" aria-label="Poziom"><option value="">wszystkie poziomy</option><option value="w">ostrzeżenia i błędy</option><option value="e">tylko błędy</option></select>
-      <select id="range" aria-label="Zakres czasu">
-        <option value="15m">15 min</option><option value="1h" selected>1 godz.</option><option value="6h">6 godz.</option>
-        <option value="1d">1 dzień</option><option value="7d">7 dni</option><option value="30d">30 dni</option><option value="100d">100 dni</option>
-        <option value="day">wybrany dzień…</option>
-      </select>
-      <input type="date" id="day" aria-label="Dzień" hidden>
-      <input type="time" id="dfrom" aria-label="Od godziny" value="00:00" hidden>
-      <input type="time" id="dto" aria-label="Do godziny" value="23:59" hidden>
-    </div>
-    <div id="box"><div id="log"></div><div id="pos" hidden><span></span><u><i></i></u><span class="num"></span></div><button id="jump" hidden></button></div>
-    <div id="st"><span id="msg"></span><span id="cnt"></span><a id="adv" href="/select/vmui/">zapytania zaawansowane</a></div>
-  </section>
-</main>
-</div>
-
-<script>
-const $=s=>document.querySelector(s),MAX=5000,LIMIT=1000,ALL='*',H=36e5,F=['host','source','unit'];
-// filtry poziomu po stronie bazy: priorytet z journald, a gdy go brak - slowa w tresci
-const ERR='(level:<=3 OR (level:"" (i(error) OR i(err) OR i(fatal) OR i(panic) OR i(failed) OR i(critical))))';
-const WARN='(level:4 OR (level:"" (i(warn) OR i(warning) OR i(wrn))))';
-const SRC={journald:'systemd',docker:'docker',file:'pliki',cron:'cron'};
-// rekordy techniczne agenta (stan i zasoby, lista zadan cron) nie sa zwyklymi logami
-const EXCL='NOT source:=stat NOT source:=crondef';
-const log=$('#log'),tree=$('#tree'),jump=$('#jump'),pos=$('#pos'),demo=()=>window.loghubDemo;
-window.C_ALL=[];let cronHost=null,me=null,D={units:[],hosts:new Map(),stat:new Map(),hist:new Map()},C=[],cur=null,ctl=null,live=true,seen=new Set(),fresh=0,word='',view='over',tab='hosts',started=false;
-
-const quote=v=>JSON.stringify(String(v));
-const short=u=>String(u||'').replace(/^\/var\/log\//,'').replace(/\.service$/,'');
-const parseLines=t=>t.split('\n').filter(Boolean).map(l=>{try{return JSON.parse(l)}catch{return null}}).filter(Boolean);
-const status=t=>{$('#msg').textContent=t};
-const el=(tag,cls,text)=>{const e=document.createElement(tag);if(cls)e.className=cls;if(text!=null)e.textContent=text;return e};
-const dec=x=>x.toFixed(1).replace('.0','').replace('.',',');
-const num=n=>n>=1e6?dec(n/1e6)+'M':n>=1e4?Math.round(n/1e3)+'k':n>=1e3?dec(n/1e3)+'k':String(n);
-const sum=a=>a.reduce((x,y)=>x+y,0);
-const pad=n=>String(n).padStart(2,'0');
-const key=f=>f.host+'\n'+f.source+'\n'+f.unit;
-const selOf=u=>'{host='+quote(u.host)+',source='+quote(u.source)+',unit='+quote(u.unit)+'}';
-function rel(t){
-  if(!t)return 'brak';
-  const s=(Date.now()-t)/1e3;
-  return s<90?'przed chwilą':s<5400?Math.round(s/60)+' min temu':s<129600?Math.round(s/3600)+' godz. temu':Math.round(s/86400)+' dni temu';
-}
-const relS=t=>!t?'brak':rel(t)==='przed chwilą'?'teraz':rel(t).replace(' temu','');
-function fmt(d){
-  const h=pad(d.getHours())+':'+pad(d.getMinutes())+':'+pad(d.getSeconds());
-  return d.toDateString()===new Date().toDateString()?h:pad(d.getDate())+'.'+pad(d.getMonth()+1)+' '+h;
-}
-
-// ------------------------------------------------------------ API i logowanie
-async function api(path,params,signal){
-  const body=new URLSearchParams(params);
-  const r=demo()?await demo().api(path,body,signal):await fetch('/select/logsql/'+path,{method:'POST',body,signal});
-  if(r.status===401){showLogin('Sesja wygasła. Zaloguj się ponownie.');throw new Error('sesja wygasła')}
-  if(!r.ok){const t=await r.text();throw new Error(r.status+(/^\s*</.test(t)?' (centrala albo tunel nie odpowiada)':' '+t.slice(0,200)))}
-  return r;
-}
-async function auth(path,body){
-  if(demo())return demo().auth(path,body);
-  const r=await fetch('/auth/'+path,body?{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}:{});
-  return {status:r.status,data:await r.json().catch(()=>({}))};
-}
-function showLogin(msg){
-  me=null;if(ctl)ctl.abort();
-  $('#app').hidden=true;$('#login').hidden=false;$('#enr').hidden=true;
-  $('#lp').value=$('#lc').value='';$('#lerr').textContent=msg||'';
-  if(demo())$('#lhint').textContent='Tryb demo: zaloguje dowolne dane. Wpisz użytkownika „nowy”, żeby zobaczyć pierwsze logowanie z włączaniem 2FA.';
-  $('#lu').focus();
-}
-function enter(u){
-  me=u;$('#login').hidden=true;$('#app').hidden=false;
-  $('#who').textContent=u.user;$('#role').textContent=u.role==='admin'?'administrator':(u.hosts?'oglądający: '+(u.hosts.length?u.hosts.length+' masz.':'brak'):'oglądający');
-  $('#navusers').hidden=u.role!=='admin';$('#navstat').hidden=u.role!=='admin';$('#navadd').hidden=u.role!=='admin';if((view==='status'||view==='add')&&u.role!=='admin')view='over';$('#adv').hidden=!!u.hosts||!!demo();if(view==='users'&&u.role!=='admin')view='over';
-  if(demo()){$('#demo').hidden=false;$('#adv').hidden=true}
-  if(!started){started=true;setInterval(refresh,6e4);setInterval(()=>{if(me&&view==='logs')headStats()},3e4);setInterval(pollStat,15e3);setInterval(loadNotif,3e4);
-    // gdy strumien milczy (np. tunel go wstrzymal), co 20 s dociagamy nowe linie zwyklym zapytaniem
-    setInterval(()=>{if(me&&view==='logs'&&live&&cur&&cur.q&&!cur.win&&ctl&&!document.hidden&&Date.now()-lastData>25e3)catchUp(cur.q,ctl.signal)},2e4)}
-  show(view);refresh();loadNotif();
-}
-$('#lf').onsubmit=async e=>{
-  e.preventDefault();$('#lgo').disabled=true;$('#lerr').textContent='';
-  try{
-    const {status:s,data:d}=await auth('login',{user:$('#lu').value,pass:$('#lp').value,code:$('#lc').value});
-    if(s===200&&d.user)return enter(d);
-    if(d.enroll){
-      $('#enr').hidden=false;$('#key').textContent=d.enroll.secret.replace(/(.{4})/g,'$1 ').trim();$('#kuri').href=d.enroll.uri;
-      $('#kcopy').onclick=()=>navigator.clipboard.writeText(d.enroll.secret).then(()=>{$('#kcopy').textContent='skopiowano'}).catch(()=>{});
-      $('#lerr').textContent=s===401?'Kod się nie zgadza. Sprawdź, czy telefon ma dobrą godzinę, i wpisz aktualny kod.':'';
-      $('#lc').placeholder='6 cyfr';$('#lc').focus();
-    }else $('#lerr').textContent=s===429?'Za dużo nieudanych prób. Spróbuj ponownie za '+(d.retry||60)+' s.':s===401?'Nieprawidłowy użytkownik, hasło lub kod.':'Logowanie nie działa (błąd '+s+'). Sprawdź, czy centrala jest uruchomiona.';
-  }catch(x){$('#lerr').textContent='Brak połączenia z centralą.'}
-  finally{$('#lgo').disabled=false}
-};
-$('#out').onclick=async()=>{await auth('logout',{}).catch(()=>{});showLogin('')};
-
-// ------------------------------------------------------------------- dane
-async function hits(query,from,step,fields=[]){
-  const now=Date.now(),t0=Math.floor(from/step)*step,n=Math.ceil((now-t0)/step);
-  const p=[['query',query],['start',new Date(from).toISOString()],['end',new Date(now).toISOString()],['step',step/1e3+'s'],...fields.map(f=>['field',f])];
-  const j=await(await api('hits',p)).json();
-  return (j.hits||[]).map(h=>{
-    const v=new Array(n).fill(0);
-    (h.timestamps||[]).forEach((ts,i)=>{const k=Math.floor((Date.parse(ts)-t0)/step);if(k>=0&&k<n)v[k]+=h.values[i]});
-    return {f:h.fields||{},v,total:h.total||0,t0};
-  });
-}
-const last24=v=>{const a=v.slice(-24);while(a.length<24)a.unshift(0);return a};
-
-// ciezsze zapytania (7 dni, wzorce bledow, cron) ida rzadziej i w tle, zeby strona rysowala sie od razu
-const I={base:new Map(),baseOk:false,baseT:0,news:[],newsT:0,seen:new Map(),seenT:0,cronT:0,defs:null,defsT:0};
-const iso=t=>new Date(t).toISOString();
-let MUTE=new Set();try{MUTE=new Set(JSON.parse(localStorage.getItem('loghub.mute')||'[]'))}catch{}
-const saveMute=()=>{try{localStorage.setItem('loghub.mute',JSON.stringify([...MUTE]))}catch{}};
-const vis=x=>!MUTE.has(x.k);
-const pl=(n,a,b,c)=>n===1?a:(n%10>=2&&n%10<=4&&(n%100<10||n%100>=20))?b:c;
-
-async function refresh(){
-  if(!me)return;
-  try{
-    const now=Date.now();
-    // etap 1: lekkie zapytania - lista zrodel z 24 h, kto pisze teraz, stan maszyn
-    const [all,up,st]=await Promise.all([
-      hits(EXCL,now-24*H,H,F),
-      api('query',{query:'_time:5m '+EXCL+' | stats by (host, source, unit) count() c'}).then(r=>r.text()).then(t=>new Set(parseLines(t).map(key))).catch(()=>null),
-      api('query',{query:'{source="stat"} _time:10m',limit:500}).then(r=>r.text()).then(parseLines).catch(()=>[])]);
-    D.stat=readStat(st);D.all=all;D.up=up;D.now=now;
-    build();paint();loadHist();
-    // etap 2: bledy i ostrzezenia z 24 h
-    const [er,wa]=await Promise.all([hits(ERR+' '+EXCL,now-24*H,H,F).catch(()=>null),hits(WARN+' '+EXCL,now-24*H,H,F).catch(()=>null)]);
-    if(er)D.er=er;if(wa)D.wa=wa;
-    build();paint();
-    // etap 3: w tle i rzadziej
-    if(now-I.seenT>10*6e4)loadSeen();
-    if(now-I.baseT>15*6e4)loadBase();
-    if(now-I.newsT>10*6e4)loadNews();
-    if(now-I.cronT>5*6e4)loadCron();
-  }catch(e){status('Nie udało się odświeżyć listy źródeł: '+e.message)}
-}
-function build(){
-  const now=D.now||Date.now(),A=new Map((D.all||[]).map(h=>[key(h.f),h])),E=new Map((D.er||[]).map(h=>[key(h.f),h])),W=new Map((D.wa||[]).map(h=>[key(h.f),h]));
-  D.units=[];
-  for(const k of new Set([...A.keys(),...I.seen.keys()])){
-    const h=A.get(k),f=h?h.f:I.seen.get(k).f;
-    if(!f.host||f.source==='crondef'||f.source==='stat')continue;
-    const li=h?h.v.findLastIndex(x=>x>0):-1,v=h?last24(h.v):new Array(24).fill(0),isUp=D.up?D.up.has(k):!!h&&li>=h.v.length-1;
-    const ev=E.has(k)?last24(E.get(k).v):null,old=I.seen.has(k)?I.seen.get(k).t:0;
-    D.units.push({host:f.host,source:f.source||'?',unit:f.unit||'?',k,v,c24:sum(v),ev,e24:ev?sum(ev):0,
-      w24:W.has(k)?sum(last24(W.get(k).v)):0,up:isUp,last:isUp?now:li<0?old:Math.min(now,h.t0+(li+1)*H)});
-  }
-  // kontenery bez logow i padniete uslugi tez maja byc widoczne
-  for(const [host,s] of D.stat){
-    const have=new Set(D.units.filter(u=>u.host===host).map(u=>u.source+'\n'+u.unit));
-    const add=(source,unit)=>{if(!have.has(source+'\n'+unit))D.units.push({host,source,unit,k:host+'\n'+source+'\n'+unit,v:new Array(24).fill(0),c24:0,ev:null,e24:0,w24:0,up:false,last:0})};
-    for(const c of s.cmap.keys())add('docker',c);
-    for(const [n,x] of s.umap)if(x[1]==='failed')add('journald',n);
-  }
-  // zdarzenia z 24 h: skoki ponad norme zrodla i nowe rodzaje bledow
-  D.base=I.baseOk?I.base:baseOf(D.er||[]);
-  D.inc=incidentsFrom(D.er||[],D.base,now-24*H,I.news);
-  const ic=new Map(),nc=new Map();
-  for(const x of D.inc.filter(vis)){ic.set(x.k,(ic.get(x.k)||0)+1);nc.set(x.k,(nc.get(x.k)||0)+x.news.length)}
-  for(const u of D.units){u.sel=selOf(u);[u.st,u.stt]=ustate(u);u.inc=ic.get(u.k)||0;u.nnew=nc.get(u.k)||0;u.norm=D.base.get(u.k)||null}
-  D.hosts=new Map();
-  for(const u of D.units){
-    const h=D.hosts.get(u.host)||D.hosts.set(u.host,{name:u.host,units:[],c24:0,e24:0,w24:0,inc:0,nnew:0,up:false,last:0,v:new Array(24).fill(0),ev:new Array(24).fill(0)}).get(u.host);
-    h.units.push(u);h.c24+=u.c24;h.e24+=u.e24;h.w24+=u.w24;h.inc+=u.inc;h.nnew+=u.nnew;h.up=h.up||u.up;h.last=Math.max(h.last,u.last);
-    if(u.st==='bad')(h.bad=h.bad||[]).push(u);
-    u.v.forEach((x,i)=>{h.v[i]+=x});if(u.ev)u.ev.forEach((x,i)=>{h.ev[i]+=x});
-  }
-  // serwer jest online, gdy agent przyslal stan w ciagu 3 minut (gdy brak pomiarow: gdy pisze logi)
-  for(const h of D.hosts.values()){const s=D.stat.get(h.name);h.bad=h.bad||[];if(s){h.up=now-s.t<3*6e4;h.last=Math.max(h.last,s.t)}}
-}
-function paint(){
-  const sc=tree.scrollTop;renderTree();tree.scrollTop=sc;renderOver();
-  if(view==='logs')headStats();
-  if(!D.units.length&&I.seenT)status('Brak logów z ostatnich 7 dni. Zainstaluj agenta na pierwszej maszynie.');
-}
-// zrodla, ktore milcza dluzej niz dobe, ale pisaly w ciagu 7 dni
-async function loadSeen(){
-  I.seenT=Date.now();
-  try{
-    const rows=parseLines(await(await api('query',{query:'_time:7d '+EXCL+' | stats by (host, source, unit) max(_time) t'})).text());
-    I.seen=new Map(rows.filter(o=>o.host).map(o=>[key(o),{f:{host:o.host,source:o.source,unit:o.unit},t:Date.parse(o.t)||0}]));build();paint();
-  }catch{}
-}
-// norma bledow kazdego zrodla z 7 dni (godzinowo)
-async function loadBase(){
-  I.baseT=Date.now();
-  try{I.base=baseOf(await hits(ERR+' '+EXCL,Date.now()-7*24*H,H,F));I.baseOk=true;build();paint()}catch{}
-}
-async function loadNews(){
-  I.newsT=Date.now();
-  try{const now=Date.now();I.news=await patterns(now-24*H,now);build();paint()}catch{}
-}
-
-// ------------------------------------------------------------- zdarzenia
-// norma zrodla: 75. percentyl bledow na godzine; staly szum: bledy w co najmniej polowie godzin
-function baseOf(series){
-  const m=new Map();
-  for(const h of series){
-    if(!h.f.host)continue;
-    const v=h.v.slice(0,-1),s=v.slice().sort((a,b)=>a-b),nz=v.filter(x=>x>0).length;
-    m.set(key(h.f),{p75:s[Math.floor(s.length*.75)]||0,chronic:v.length>=23&&nz/v.length>=.5,rate:sum(v)/Math.max(1,v.length)});
-  }
-  return m;
-}
-const thrOf=b=>Math.max(5,Math.ceil(4*(b?b.p75:0)));
-// rodzaje bledow (liczby zwiniete do <N>), ktore pierwszy raz pojawily sie w [from, to]; porownanie z 14 dniami wczesniej
-async function patterns(from,to){
-  const q=ERR+' '+EXCL+' | collapse_nums | stats by (host, source, unit, _msg) min(_time) first, count() c | sort by (first desc) | limit 400';
-  const rows=parseLines(await(await api('query',{query:q,start:iso(from-14*24*H),end:iso(to)})).text());
-  return rows.filter(o=>o.host&&o.source!=='stat'&&o.source!=='crondef').map(o=>({f:{host:o.host,source:o.source,unit:o.unit},k:key(o),msg:o._msg||'',first:Date.parse(o.first),c:+o.c||0})).filter(p=>p.first>=from);
-}
-function incidentsFrom(series,base,from,news){
-  const out=[],by=new Map(),push=c=>{out.push(c);(by.get(c.k)||by.set(c.k,[]).get(c.k)).push(c)};
-  for(const h of series){
-    if(!h.f.host)continue;
-    const k=key(h.f),b=base.get(k),thr=thrOf(b);let c=null;
-    h.v.forEach((x,i)=>{
-      const t=h.t0+i*H;if(t+H<=from||x<thr)return;
-      if(c&&t-c.to<=H){c.to=t+H;c.lines+=x;c.peak=Math.max(c.peak,x)}
-      else{c={f:h.f,k,from:t,to:t+H,lines:x,peak:x,norm:b?b.p75:0,spike:true,news:[]};push(c)}
-    });
-  }
-  // nowe rodzaje bledow: doklejone do skoku tego samego zrodla albo jako osobne zdarzenie
-  const nk=new Map();for(const p of news||[])(nk.get(p.k)||nk.set(p.k,[]).get(p.k)).push(p);
-  for(const [k,ps] of nk){
-    ps.sort((a,b)=>a.first-b.first);
-    if(ps.length>12){ // wiele naraz: nowe zrodlo albo duza zmiana - jedno zdarzenie
-      push({f:ps[0].f,k,from:Math.floor(ps[0].first/H)*H,to:Math.floor(ps[ps.length-1].first/H)*H+H,lines:sum(ps.map(p=>p.c)),peak:0,spike:false,many:true,news:ps.slice().sort((a,b)=>b.c-a.c)});
-      continue;
-    }
-    for(const p of ps){
-      let c=(by.get(k)||[]).find(x=>!x.many&&p.first>=x.from-H&&p.first<x.to+H);
-      if(!c){const hb=Math.floor(p.first/H)*H;c={f:p.f,k,from:hb,to:hb+H,lines:0,peak:0,spike:false,news:[]};push(c)}
-      c.news.push(p);if(!c.spike)c.lines+=p.c;
-    }
-  }
-  return out.sort((a,b)=>b.from-a.from);
-}
-
-// ------------------------------------------------------------ stan i zasoby
-const pj=x=>{if(Array.isArray(x))return x;try{const v=JSON.parse(x||'[]');return Array.isArray(v)?v:[]}catch{return []}};
-const fnum=x=>{const v=parseFloat(String(x??'').replace(',','.'));return isNaN(v)?null:v};
-function readStat(rows){
-  const m=new Map();
-  for(const o of rows){
-    const t=Date.parse(o._time);if(!o.host||(m.has(o.host)&&m.get(o.host).t>=t))continue;
-    const cs=new Map(pj(o.cstats).map(c=>[c.n,c]));
-    m.set(o.host,{t,o,cpu:fnum(o.cpu),mem:fnum(o.mem_pct),disk:fnum(o.disk_pct),cores:+o.cores||1,load:fnum(o.load1),
-      memT:+o.mem_total_kb||0,memA:+o.mem_avail_kb||0,diskU:+o.disk_used_kb||0,diskT:+o.disk_total_kb||0,
-      cmap:new Map(pj(o.containers).map(c=>[c.n,Object.assign({},c,cs.get(c.n)||{})])),
-      umap:new Map(pj(o.units).map(x=>[x[0],x])),guests:pj(o.guests),
-      disks:pj(o.disks).filter(d=>Array.isArray(d)&&d[4]>0),pools:pj(o.pools),smart:pj(o.smart),ports:o.ports==null?null:pj(o.ports),
-      ufwState:o.ufw_state||null,ufw:pj(o.ufw)});
-  }
-  return m;
-}
-// stan kontenera lub uslugi: 'up' dziala, 'down' zatrzymane bez bledu, 'bad' padlo; null gdy nie wiadomo
-function cstate(c){
-  if(c.s==='running')return /unhealthy/.test(c.st)?['bad','działa, ale nie przechodzi kontroli zdrowia']:['up','działa'+(/healthy/.test(c.st)?', zdrowy':'')];
-  if(c.s==='restarting')return ['bad','ciągle się restartuje'];
-  if(c.s==='exited')return /Exited \(0\)/.test(c.st)?['down','zatrzymany']:['bad','padł: '+c.st];
-  if(c.s==='paused')return ['down','wstrzymany'];
-  return ['down',c.st||c.s||'nie działa'];
-}
-function ustate(u){
-  const s=D.stat.get(u.host);
-  if(!s)return [null,''];
-  if(u.source==='docker'){const c=s.cmap.get(u.unit);return c?cstate(c):[null,'']}
-  if(u.source==='journald'&&/\.service$/.test(u.unit)){
-    const x=s.umap.get(u.unit);
-    if(!x)return ['down','nieaktywna (zakończona albo zatrzymana)'];
-    return x[1]==='failed'?['bad','padła (failed)']:x[1]==='active'?['up','działa'+(x[2]==='exited'?' (jednorazowa, zakończona)':'')]:['up',x[1]+' / '+x[2]];
-  }
-  return [null,''];
-}
-const dotc=st=>'dot'+(st==='up'?' up':st==='bad'?' bad':'');
-const gb=kb=>dec(kb/1048576)+' GB';
-const pc=v=>v==null?'–':dec(v)+'%';
-const lvlc=v=>v>=90?'e':v>=75?'w':'';
-function meter(label,v,sub){
-  const m=el('div','mt'),r=el('div','row'),b=el('div','bar'),i=el('i',lvlc(v||0));
-  i.style.width=Math.min(100,Math.max(0,v||0))+'%';b.append(i);
-  r.append(el('span','lbl',label),el('b','',pc(v)));const s=el('small','',sub||'');s.title=sub||'';m.append(r,b,s);return m;
-}
-// zasoby i stan na zywo: agenci mierza co ok. 20 s, strona pyta co 15 s
-async function pollStat(){
-  if(!me||document.hidden)return;
-  try{
-    D.stat=readStat(parseLines(await(await api('query',{query:'{source="stat"} _time:10m',limit:500})).text()));
-    const now=Date.now();
-    for(const u of D.units)[u.st,u.stt]=ustate(u);
-    for(const h of D.hosts.values()){h.bad=h.units.filter(u=>u.st==='bad');const s=D.stat.get(h.name);if(s){h.up=now-s.t<3*6e4;h.last=Math.max(h.last,s.t)}}
-    const sc=tree.scrollTop;renderTree();tree.scrollTop=sc;
-    if(view==='over')renderOver(true);
-    if(view==='logs')resBox();
-  }catch{}
-}
-
-// srednie CPU i RAM z ostatnich 24 h, w kubelkach po 30 min
-async function loadHist(){
-  try{
-    const rows=parseLines(await(await api('query',{query:'{source="stat"} _time:24h | stats by (host, _time:30m) avg(cpu) cpu, avg(mem_pct) mem'})).text());
-    const step=30*6e4,end=Math.floor(Date.now()/step)*step,m=new Map();
-    for(const o of rows){
-      const k=47-Math.round((end-Date.parse(o._time))/step);if(k<0||k>47)continue;
-      const x=m.get(o.host)||m.set(o.host,{cpu:new Array(48).fill(null),mem:new Array(48).fill(null)}).get(o.host);
-      x.cpu[k]=fnum(o.cpu);x.mem[k]=fnum(o.mem);
-    }
-    D.hist=m;renderOver();
-  }catch{}
-}
-function sparkPct(box,v,stepMs){
-  box.textContent='';const end=Date.now(),top=Math.max(25,...v.filter(x=>x!=null));
-  v.forEach((x,i)=>{
-    const b=el('i',x==null?'z':lvlc(x)==='e'?'e':'');b.style.height=x==null?'':Math.max(6,Math.round(x/top*100))+'%';
-    if(lvlc(x||0)==='w')b.style.background='var(--warn)';
-    const d=new Date(end-(v.length-1-i)*stepMs);b.title=pad(d.getHours())+':'+pad(d.getMinutes())+' · CPU '+(x==null?'brak pomiaru':pc(x));
-    box.append(b);
-  });
-}
-
-function spark(box,v,ev,stepMs){
-  box.textContent='';const max=Math.max(1,...v),end=Date.now();
-  v.forEach((x,i)=>{
-    const b=el('i',x?'':'z');b.style.height=x?Math.max(8,Math.round(x/max*100))+'%':'';
-    if(x&&ev&&ev[i]){const p=Math.min(100,Math.max(15,Math.round(ev[i]/x*100)));b.style.background='linear-gradient(to top,var(--err) '+p+'%,var(--acc) '+p+'%)'}
-    if(stepMs){const d=new Date(end-(v.length-1-i)*stepMs);b.title=pad(d.getHours())+':'+pad(stepMs<H?d.getMinutes():0)+' · '+x+' linii'+(ev&&ev[i]?' · '+ev[i]+' błędów':'')}
-    box.append(b);
-  });
-}
-
-// --------------------------------------------------------------- panel boczny
-function item(label,sel,meta,u){
-  const it=el('div','it');it.dataset.sel=sel;it.dataset.k=meta.k;it.tabIndex=0;it.setAttribute('role','button');
-  if(u){const d=el('i',dotc(u.st));if(!u.st)d.style.visibility='hidden';d.title=u.stt;it.append(d)}
-  const n=el('span','',label);n.title=meta.title||label;it.append(n);
-  if(u&&u.inc){const c=el('span','chip bad',u.inc);c.title=u.inc+' '+pl(u.inc,'zdarzenie','zdarzenia','zdarzeń')+' w 24 h';it.append(c)}
-  if(u)it.append(el('small','',num(u.c24)));
-  if(cur&&cur.sel===sel)it.classList.add('on');
-  it.onclick=()=>pick(sel,meta);
-  it.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();it.onclick()}};
-  return it;
-}
-// maszyna matka: host Proxmoxa, ktorego lista gosci (LXC/VM) zawiera nazwe innej maszyny z agentem
-function linkParents(){
-  // przy kilku gosciach o tej samej nazwie wygrywa dzialajacy kontener LXC (tam instaluje sie agent)
-  const by=new Map(),score=g=>(g.status==='running'?2:0)+(g.type==='lxc'?1:0);
-  for(const [host,s] of D.stat)for(const g of s.guests)if(g.name&&g.name!==host){const o=by.get(g.name);if(!o||score(g)>score(o.g))by.set(g.name,{parent:host,g})}
-  for(const h of D.hosts.values()){const x=by.get(h.name);h.parent=x&&D.hosts.has(x.parent)?x.parent:null;h.guest=h.parent?x.g:null}
-}
-const kids=name=>[...D.hosts.values()].filter(h=>h.parent===name).sort((a,b)=>a.name.localeCompare(b.name));
-const family=name=>[name,...kids(name).flatMap(k=>family(k.name))];
-function hostNode(h,open,first){
-  const d=el('details');d.dataset.h=h.name;d.open=open.has(h.name);
-  const sm=el('summary'),dot=el('i','dot'+(h.up?(h.bad.length?' bad':' up'):''));dot.title=h.up?(h.bad.length?h.bad.length+' usług z problemem':'agent działa'):'brak kontaktu z agentem';
-  const s=D.stat.get(h.name),lab=el('span','',h.name);lab.style.overflow='hidden';lab.style.textOverflow='ellipsis';
-  sm.append(dot,lab);
-  if(h.guest)sm.append(el('span','chip',(h.guest.type==='qemu'?'VM ':'LXC ')+(h.guest.vmid||'')));
-  sm.append(el('small','',s?'CPU '+pc(s.cpu):num(h.c24)));
-  if(s)sm.title='CPU '+pc(s.cpu)+' · RAM '+pc(s.mem)+' · dysk '+pc(s.disk);
-  d.append(sm);
-  d.append(item('cały serwer','{host='+quote(h.name)+'}',{k:h.name.toLowerCase(),title:h.name,host:h.name,multi:true}));
-  // zadania cron tej maszyny (dla maszyny matki: razem z jej kontenerami)
-  const fam=family(h.name),cj=C.filter(j=>fam.includes(j.host)),cb=cj.filter(j=>j.bad).length;
-  if(cj.length){
-    const it=el('div','it');it.tabIndex=0;it.setAttribute('role','button');it.dataset.k=(h.name+' cron').toLowerCase();it.dataset.sel='cron:'+h.name;
-    it.append(el('span','','zadania cron'));if(cb)it.append(el('span','chip bad',cb));it.append(el('small','',cj.length));
-    it.onclick=()=>showCron(h.name);it.onkeydown=e=>{if(e.key==='Enter')it.onclick()};
-    d.append(it);
-  }
-  for(const src of [...new Set(h.units.map(u=>u.source))].filter(x=>x!=='cron').sort()){
-    d.append(el('div','grp',SRC[src]||src));
-    for(const u of h.units.filter(u=>u.source===src).sort((a,b)=>a.unit.localeCompare(b.unit)))
-      d.append(item(short(u.unit),u.sel,{k:(u.host+' '+src+' '+u.unit).toLowerCase(),title:short(u.unit),host:u.host,source:src,unit:u.unit},u));
-  }
-  // goscie Proxmoxa: z agentem jako zagniezdzone maszyny, bez agenta jako sam stan
-  const ks=kids(h.name),withAgent=new Set(ks.map(k=>k.guest&&k.guest.id)),bare=s?s.guests.filter(g=>!withAgent.has(g.id)):[];
-  if(ks.length||bare.length){
-    d.append(el('div','grp','LXC i VM'));
-    for(const k of ks)d.append(hostNode(k,open,first));
-    for(const g of bare.sort((a,b)=>String(a.name).localeCompare(String(b.name)))){
-      const on=g.status==='running',it=el('div','it ghost');it.dataset.k=(h.name+' '+g.name).toLowerCase();
-      const dt=el('i','dot'+(on?' up':''));dt.title=g.status||'';
-      it.append(dt,el('span','',(g.name||g.id)+' · '+(g.type==='qemu'?'VM ':'LXC ')+(g.vmid||'')),el('small','',on?pc((g.cpu||0)*100):'stop'));
-      it.title='bez agenta loghub: widać tylko stan i zużycie z Proxmoxa';d.append(it);
-    }
-  }
-  return d;
-}
-function renderTree(){
-  const open=new Set([...tree.querySelectorAll('details[open]')].map(d=>d.dataset.h)),first=!tree.children.length;
-  linkParents();
-  tree.textContent='';
-  for(const h of [...D.hosts.values()].filter(h=>!h.parent).sort((a,b)=>a.name.localeCompare(b.name)))tree.append(hostNode(h,open,first));
-  const e=(D.inc||[]).filter(vis).length;$('#nerr').hidden=!e;$('#nerr').textContent=e;$('#nerr').title=e+' '+pl(e,'zdarzenie','zdarzenia','zdarzeń')+' w 24 h';
-  filterTree();marks();
-}
-function filterTree(){
-  const t=$('#f').value.trim().toLowerCase();
-  for(const it of tree.querySelectorAll('.it'))it.hidden=!!t&&!it.dataset.k.includes(t);
-  for(const d of tree.querySelectorAll('details')){d.hidden=!!t&&!d.querySelector('.it:not([hidden])');if(t&&!d.hidden)d.open=true}
-}
-function marks(){
-  for(const x of tree.querySelectorAll('.it'))x.classList.toggle('on',(view==='logs'&&!!cur&&x.dataset.sel===cur.sel)||(view==='cron'&&!!cronHost&&x.dataset.sel==='cron:'+cronHost));
-  const k=view==='cron'&&cronHost?'':view!=='logs'?view:cur&&cur.sel===ALL?($('#lvl').value?'err':'all'):'';
-  for(const b of document.querySelectorAll('#nav button'))b.classList.toggle('on',b.dataset.go===k);
-}
-function show(v){view=v;$('#over').hidden=v!=='over';$('#logs').hidden=v!=='logs';$('#cronv').hidden=v!=='cron';$('#notv').hidden=v!=='notif';$('#usersv').hidden=v!=='users';$('#statv').hidden=v!=='status';$('#addv').hidden=v!=='add';marks();if(v==='add')loadAdd();if(v==='notif')loadNotif(true);if(v==='users')loadUsers();if(v==='status')loadStat()}
-
-// -------------------------------------------------------------------- przeglad
-function renderOver(light){
-  const hs=[...D.hosts.values()],us=D.units,upH=hs.filter(h=>h.up).length,bad=us.filter(u=>u.st==='bad').length,inc=(D.inc||[]).filter(vis),nn=sum(inc.map(x=>x.news.length));
-  const tiles=$('#tiles');tiles.textContent='';
-  for(const [v,l,c,go] of [[num(sum(us.map(u=>u.c24))),'linii w 24 h',''],[inc.length,pl(inc.length,'zdarzenie','zdarzenia','zdarzeń')+' w 24 h',inc.length?'e':'g',1],[nn,pl(nn,'nowy rodzaj','nowe rodzaje','nowych rodzajów')+' błędów',nn?'w':'',1],[upH+' / '+hs.length,'serwerów online',upH<hs.length?'w':'g'],[bad,'usług z problemem',bad?'e':'g']]){
-    const d=el('div',c+(go?' go':''));d.append(el('b','',v),el('span','mut',l));
-    if(go){d.title='pokaż zdarzenia';d.onclick=()=>openInc('')}
-    tiles.append(d);
-  }
-  const cards=$('#cards');cards.textContent='';
-  for(const h of hs.sort((a,b)=>a.up-b.up||b.bad.length-a.bad.length||b.inc-a.inc||a.name.localeCompare(b.name))){
-    const c=el('div','card'+(h.up?'':' off')),hd=el('header');
-    hd.append(el('i','dot'+(h.up?(h.bad.length?' bad':' up'):'')),el('b','',h.name),el('span','chip '+(!h.up?'wrn':h.bad.length?'bad':'ok'),!h.up?'milczy: '+rel(h.last):h.bad.length?h.bad.length+' z problemem':'online'));
-    const s=D.stat.get(h.name),res=[];
-    if(s){
-      const ms=el('div','meters');
-      const top=s.disks.length?s.disks.slice().sort((a,b)=>b[3]/b[4]-a[3]/a[4])[0]:null;
-      ms.append(meter('CPU',s.cpu,s.cores+' rdz., obc. '+(s.load==null?'–':dec(s.load))),meter('RAM',s.mem,s.memT?gb(s.memT-s.memA)+' / '+gb(s.memT):''),
-        top?meter('Dysk',top[3]/top[4]*100,top[0]+' · '+gb(top[3])+' / '+gb(top[4])):meter('Dysk /',s.disk,s.diskT?gb(s.diskU)+' / '+gb(s.diskT):''));
-      res.push(ms);
-      if(s.disks.length>1||s.smart.length||s.pools.length){
-        const dl=el('div','dlist');dl.append(el('span','lbl','Dyski i udziały'));
-        for(const d of s.disks.slice().sort((a,b)=>a[0].localeCompare(b[0]))){
-          const r=el('div','dl'),v=d[3]/d[4]*100,b=el('div','bar'),i=el('i',lvlc(v));i.style.width=Math.min(100,v)+'%';b.append(i);
-          const n=el('span','',d[0]);n.title=d[0]+' · '+d[2]+' · '+d[1];r.append(n,b,el('span','num',gb(d[3])+' / '+gb(d[4])));dl.append(r);
-        }
-        const chips=el('div','probs');
-        for(const x of s.smart){const [st,txt]=smartState(x);const c=el('span','chip '+(st==='bad'?'bad':st==='warn'?'wrn':'ok'),x[0].replace('/dev/','')+(x[4]!=null?' '+x[4]+'°C':'')+' · '+txt);c.title=(x[1]||'')+(x[5]!=null?' · '+num(x[5])+' h pracy':'')+(x[8]?' · '+x[8]:'');chips.append(c)}
-        for(const p of s.pools){const ok=p[3]==='ONLINE',c=el('span','chip '+(ok?'ok':'bad'),'ZFS '+p[0]+' · '+p[3]);chips.append(c)}
-        if(chips.children.length)dl.append(chips);
-        res.push(dl);
-      }
-      if(s.ports){const pub=s.ports.filter(x=>pscope(x[1])==='all'&&x[0]==='tcp').length,b=el('button','chip'+(s.ufwState==='inactive'?' wrn':''),s.ports.length+' portów nasłuchuje'+(pub?', '+pub+' TCP na wszystkich interfejsach':'')+(s.ufwState==='active'?' · ufw: '+s.ufw.length+' otwartych na świat':s.ufwState==='inactive'?' · ufw wyłączony':''));
-        b.style.alignSelf='flex-start';b.onclick=()=>{$('#ps').value=h.name;document.querySelector('#tabs button[data-tab=ports]').click()};res.push(b)}
-      const hi=D.hist.get(h.name);
-      if(hi){const r2=el('div','row');r2.append(el('span','lbl','CPU 24 h'),el('span','num mut','śr. '+pc(sum(hi.cpu.filter(x=>x!=null))/Math.max(1,hi.cpu.filter(x=>x!=null).length))));const sp2=el('div','sp');sparkPct(sp2,hi.cpu,30*6e4);res.push(r2,sp2)}
-    }
-    if(h.bad.length){
-      const pr=el('div','probs');
-      for(const u of h.bad.slice(0,6)){const b=el('button','chip bad',short(u.unit));b.title=u.stt;b.onclick=()=>pick(u.sel,{title:short(u.unit),host:u.host,source:u.source,unit:u.unit},'');pr.append(b)}
-      if(h.bad.length>6)pr.append(el('span','chip bad','+'+(h.bad.length-6)));
-      res.push(pr);
-    }
-    if(s&&s.guests.length){
-      const g=el('div','guests');g.append(el('span','lbl','Kontenery LXC i VM na tym Proxmoxie'));
-      const gs=s.guests.slice().sort((a,b)=>(b.status==='running')-(a.status==='running')||(b.cpu||0)-(a.cpu||0));
-      for(const x of gs.slice(0,8)){
-        const r3=el('div'),on=x.status==='running';
-        r3.append(el('i','dot'+(on?' up':'')),el('span','',(x.name||x.id)+' · '+(x.type==='qemu'?'VM':'LXC')+' '+(x.vmid||'')),el('span','num',on?pc((x.cpu||0)*100):'–'),el('span','num mut',on&&x.maxmem?gb(x.mem/1024)+' / '+gb(x.maxmem/1024):x.status||''));
-        r3.title=on?'CPU liczone od przydzielonych rdzeni ('+(x.maxcpu||'?')+')':'zatrzymany';g.append(r3);
-      }
-      if(gs.length>8)g.append(el('span','mut','+'+(gs.length-8)+' więcej w zakładce Zasoby'));
-      res.push(g);
-    }
-    const r=el('div','row');r.append(el('span','lbl','Aktywność 24 h'),el('span','num mut',num(h.c24)+' linii'));
-    const sp=el('div','sp');spark(sp,h.v,h.ev,H);
-    const types=el('div','mut',[...new Set(h.units.map(u=>u.source))].sort().map(s=>h.units.filter(u=>u.source===s).length+' '+(SRC[s]||s)).join(' · '));
-    const kv=el('div','kv');
-    for(const [v,l,k] of [[num(h.c24),'linie',''],[h.inc,pl(h.inc,'zdarzenie','zdarzenia','zdarzeń'),h.inc?'e':''],[h.nnew,'nowe błędy',h.nnew?'w':''],[relS(h.last),'ostatni log','']]){
-      const d=el('div');d.append(el('b',k,v),el('span','mut',l));kv.append(d);
-    }
-    const ft=el('footer'),b1=el('button','','Logi'),b2=el('button','','Zdarzenia');
-    const meta={title:h.name,host:h.name,multi:true};
-    b1.onclick=()=>pick('{host='+quote(h.name)+'}',meta,'');
-    b2.onclick=()=>openInc(h.name);b2.disabled=!h.inc;
-    ft.append(b1,b2);c.append(hd,...res,r,sp,types,kv,ft);cards.append(c);
-  }
-  renderUnits();renderRes();renderDisks();renderPorts();
-  const lt=Math.max(0,...[...D.stat.values()].map(s=>s.t));
-  $('#osub').textContent='Stan serwerów i logi z ostatnich 24 godzin.'+(lt?' Zasoby odświeżane na bieżąco, ostatni pomiar '+rel(lt)+'.':'');
-  if(tab==='errs'&&!light)loadInc();
-}
-function renderUnits(){
-  const t=$('#us').value.trim().toLowerCase(),by=$('#usort').value,dir=+$('#udir').value,tbl=$('#tbl');
-  const us=D.units.filter(u=>!t||(u.host+' '+u.unit).toLowerCase().includes(t)).sort((a,b)=>(by==='unit'?a.unit.localeCompare(b.unit):a[by]-b[by])*dir||a.unit.localeCompare(b.unit));
-  const max=Math.max(1,...us.map(u=>u.c24));
-  tbl.textContent='';
-  const hd=el('div','tr h');for(const x of ['Źródło','Serwer','Typ','Linie 24 h','Zdarzenia','Błędy zwykle','Ostatni log'])hd.append(el('span','',x));tbl.append(hd);
-  for(const u of us){
-    const r=el('div','tr'),n=el('span'),dt=el('i',dotc(u.st));if(!u.st)dt.style.visibility='hidden';dt.title=u.stt;n.append(dt,el('span','',short(u.unit)));n.title=u.unit;
-    const vol=el('span','vol'),bar=el('i');bar.style.width=Math.round(u.c24/max*100)+'%';vol.append(el('span','',num(u.c24)),bar);
-    const e=el('span');if(u.inc){const c=el('span','chip bad',u.inc);c.title=num(u.e24)+' linii z błędami w 24 h';e.append(c)}else e.textContent='–';
-    const w=el('span','mut'),nm=u.norm;
-    if(nm&&nm.chronic){const c=el('span','chip wrn',MUTE.has(u.k)?'wyciszone':'stały szum');c.title='średnio ~'+rate(nm.rate)+' błędów na godzinę';w.append(c)}
-    else w.textContent=nm&&nm.rate>=.05?'~'+rate(nm.rate)+'/h':'–';
-    r.append(n,el('span','',u.host),el('span','mut',SRC[u.source]||u.source),vol,e,w,el('span','mut',rel(u.last)));
-    r.tabIndex=0;r.onclick=()=>pick(u.sel,{title:short(u.unit),host:u.host,source:u.source,unit:u.unit},'');
-    r.onkeydown=x=>{if(x.key==='Enter')r.onclick()};
-    tbl.append(r);
-  }
-  if(!us.length)tbl.append(el('div','n','Żadne źródło nie pasuje do wyszukiwania.'));
-}
-const rate=x=>x>=10?num(Math.round(x)):dec(x);
-const WD=['niedz.','pon.','wt.','śr.','czw.','pt.','sob.'];
-const dlab=d=>WD[d.getDay()]+' '+pad(d.getDate())+'.'+pad(d.getMonth()+1);
-function winLabel(a,b){
-  const A=new Date(a),B=new Date(b),t=d=>pad(d.getHours())+':'+pad(d.getMinutes());
-  if(A.toDateString()===new Date(b-1).toDateString())return dlab(A)+', '+t(A)+'–'+(t(B)==='00:00'?'24:00':t(B));
-  return dlab(A)+' '+t(A)+' – '+dlab(B)+' '+t(B);
-}
-let IR={k:'',t:0,list:[],base:new Map(),days:1,day:null};
-function openInc(host){
-  if(view!=='over')show('over');
-  $('#ir').value='1d';IR.day=null;fillHosts();$('#ih').value=host||'';
-  document.querySelector('#tabs button[data-tab=errs]').click();
-}
-function fillHosts(){
-  const ih=$('#ih'),cv=ih.value;ih.textContent='';ih.append(new Option('wszystkie serwery',''));
-  for(const n of [...D.hosts.keys()].sort())ih.append(new Option(n+(kids(n).length?' (z kontenerami)':''),n));
-  ih.value=D.hosts.has(cv)?cv:'';
-}
-async function loadInc(){
-  fillHosts();
-  const r=$('#ir').value,days={'1d':1,'7d':7,'30d':30,'90d':90}[r]||1,now=Date.now();
-  if(days===1){IR={k:r,t:now,list:D.inc||[],base:D.base||new Map(),days:1,day:IR.k===r?IR.day:null};$('#imsg').textContent='';return renderInc()}
-  if(IR.k===r&&now-IR.t<5*6e4)return renderInc();
-  $('#imsg').textContent='Liczę zdarzenia z '+days+' dni…';
-  try{
-    const from=now-days*24*H,series=await hits(ERR+' '+EXCL,from-7*24*H,H,F),base=baseOf(series);
-    const news=await patterns(from,now).catch(()=>[]);
-    if($('#ir').value!==r)return;
-    IR={k:r,t:now,list:incidentsFrom(series,base,from,news),base,days,day:null};$('#imsg').textContent='';
-  }catch(e){$('#imsg').textContent='Nie udało się policzyć zdarzeń: '+e.message;return}
-  renderInc();
-}
-function renderInc(){
-  const hf=$('#ih').value,fam=hf?family(hf):null,L=IR.list.filter(x=>vis(x)&&(!fam||fam.includes(x.f.host)));
-  // pasek: godziny (24 h) albo dni; kolor zalezy od liczby zdarzen
-  const box=$('#idays'),hourly=IR.days===1,starts=[];box.textContent='';
-  if(hourly){const e=Math.floor(Date.now()/H)*H;for(let i=23;i>=0;i--)starts.push(e-i*H)}
-  else{const d=new Date();d.setHours(0,0,0,0);for(let i=IR.days-1;i>=0;i--){const x=new Date(d);x.setDate(d.getDate()-i);starts.push(+x)}}
-  const ends=starts.map((x,i)=>i+1<starts.length?starts[i+1]:x+(hourly?H:24*H));
-  const cnt=starts.map((x,i)=>L.filter(y=>y.from<ends[i]&&y.to>x).length),mx=Math.max(1,...cnt);
-  starts.forEach((x,i)=>{
-    const c=cnt[i],b=el('button',c?'l'+(c/mx>.66?3:c/mx>.33?2:1):''),d=new Date(x);
-    b.append(el('b','',c||''),el('span','',hourly?pad(d.getHours()):IR.days>31?d.getDate():d.getDate()+'.'+pad(d.getMonth()+1)));
-    b.title=(hourly?pad(d.getHours())+':00–'+pad(new Date(ends[i]).getHours())+':00':d.toLocaleDateString('pl-PL',{weekday:'long',day:'numeric',month:'long'}))+' · '+(c?c+' '+pl(c,'zdarzenie','zdarzenia','zdarzeń'):'spokój');
-    if(IR.day&&IR.day[0]===x)b.classList.add('on');
-    b.onclick=()=>{IR.day=IR.day&&IR.day[0]===x?null:[x,ends[i]];renderInc()};
-    box.append(b);
-  });
-  const sel=IR.day?L.filter(x=>x.from<IR.day[1]&&x.to>IR.day[0]):L,lb=$('#ilist');lb.textContent='';
-  const head=el('div','inc');head.style.gridTemplateColumns='1fr auto';
-  head.append(el('span','lbl',(IR.day?(hourly?'Godzina '+pad(new Date(IR.day[0]).getHours())+':00':new Date(IR.day[0]).toLocaleDateString('pl-PL',{weekday:'long',day:'numeric',month:'long'})):'Cały okres')+' · '+sel.length+' '+pl(sel.length,'zdarzenie','zdarzenia','zdarzeń')));
-  if(IR.day){const b=el('button','','pokaż cały okres');b.onclick=()=>{IR.day=null;renderInc()};head.append(b)}
-  lb.append(head);
-  for(const x of sel.slice(0,300))lb.append(incRow(x));
-  if(!sel.length)lb.append(el('div','n',IR.day?'W tym czasie nic się nie działo.':'Brak zdarzeń w tym okresie: żadnych skoków ponad normę ani nowych rodzajów błędów.'));
-  if(sel.length>300)lb.append(el('div','n','Pokazano 300 najnowszych. Wybierz dzień na pasku, żeby zobaczyć resztę.'));
-  renderNoise(fam);
-}
-function incRow(x){
-  const r=el('div','inc'),wh=el('div','what'),act=el('div','act');
-  const nm=el('b','',x.f.host+' › '+short(x.f.unit));nm.title=x.f.host+' · '+x.f.unit;
-  wh.append(nm,el('span','mut',SRC[x.f.source]||x.f.source));
-  if(x.spike){const c=el('span','chip bad','skok: '+num(x.lines)+' linii z błędami');c.title='w szczycie '+num(x.peak)+' na godzinę, zwykle do ~'+num(x.norm)+' na godzinę';wh.append(c)}
-  if(x.many)wh.append(el('span','chip wrn',x.news.length+' nowych rodzajów błędów naraz'));
-  else if(x.news.length){const n=x.news.length;wh.append(el('span','chip wrn',n===1?'nowy błąd':n+' '+pl(n,'','nowe błędy','nowych błędów')))}
-  const bl=el('button','','Logi');bl.title='błędy z tego źródła w tym oknie czasu';
-  bl.onclick=()=>pick(selOf(x.f),{title:short(x.f.unit),host:x.f.host,source:x.f.source,unit:x.f.unit},'e',null,[x.from,x.to]);
-  act.append(bl);r.append(el('div','when',winLabel(x.from,x.to)),wh,act);
-  const ms=el('div','msgs');
-  for(const p of x.news.slice(0,3)){const d=el('div','',p.msg);d.title=p.msg+'\npierwszy raz: '+fmt(new Date(p.first))+' · razem '+p.c+'×';ms.append(d)}
-  if(x.news.length>3)ms.append(el('div','','… i '+(x.news.length-3)+' innych'));
-  if(x.spike&&!x.news.length){
-    const b=el('button','','najczęstsze komunikaty');
-    b.onclick=async()=>{
-      b.disabled=true;b.textContent='Wczytuję…';
-      try{
-        const rows=parseLines(await(await api('query',{query:selOf(x.f)+' '+ERR+' | collapse_nums | stats by (_msg) count() c | sort by (c desc) | limit 3',start:iso(x.from),end:iso(x.to)})).text());
-        b.remove();for(const o of rows){const d=el('div','',(+o.c>1?num(+o.c)+'× ':'')+(o._msg||''));d.title=o._msg||'';ms.append(d)}
-        if(!rows.length)ms.append(el('div','','brak'));
-      }catch(e){b.disabled=false;b.textContent='Nie udało się, spróbuj ponownie'}
-    };
-    ms.append(b);
-  }
-  if(ms.children.length)r.append(ms);
-  return r;
-}
-// staly szum: zrodla sypiace bledami prawie bez przerwy; mozna je wyciszyc (zapamietane w tej przegladarce)
-function renderNoise(fam){
-  const box=$('#inoise');box.textContent='';
-  const rows=[...IR.base.entries()].filter(([k,b])=>b.chronic||MUTE.has(k)).map(([k,b])=>{const [host,source,unit]=k.split('\n');return {k,b,f:{host,source,unit}}}).filter(x=>!fam||fam.includes(x.f.host));
-  if(!rows.length)return;
-  box.append(el('div','lbl','Stały szum'),el('div','mut','Te źródła sypią błędami prawie bez przerwy. Ich zwykły poziom nie jest zdarzeniem; zdarzeniem jest dopiero wyraźny skok ponad normę albo nowy rodzaj błędu. Wyciszone nie pokazują żadnych zdarzeń. Wyciszenie zapamiętuje ta przeglądarka.'));
-  const t=el('div','ilist');
-  for(const x of rows.sort((a,b)=>b.b.rate-a.b.rate)){
-    const r=el('div','inc'),m=MUTE.has(x.k),wh=el('div','what'),nm=el('b','',x.f.host+' › '+short(x.f.unit));nm.title=x.f.unit;
-    wh.append(nm,el('span','mut',SRC[x.f.source]||x.f.source));if(m)wh.append(el('span','chip','wyciszone'));
-    const b=el('button','',m?'Przywróć':'Wycisz');
-    b.onclick=()=>{if(m)MUTE.delete(x.k);else MUTE.add(x.k);saveMute();build();paint();renderInc()};
-    const act=el('div','act');act.append(b);
-    r.append(el('div','when','~'+rate(x.b.rate)+' błędów / godz.'),wh,act);t.append(r);
-  }
-  box.append(t);
-}
-for(const b of document.querySelectorAll('#tabs button'))b.onclick=()=>{
-  tab=b.dataset.tab;for(const x of document.querySelectorAll('#tabs button'))x.classList.toggle('on',x===b);
-  $('#cards').hidden=tab!=='hosts';$('#units').hidden=tab!=='units';$('#errs').hidden=tab!=='errs';$('#resv').hidden=tab!=='res';$('#diskv').hidden=tab!=='disks';$('#portv').hidden=tab!=='ports';
-  if(tab==='errs')loadInc();
-};
-$('#ir').onchange=()=>{IR.day=null;loadInc()};$('#ih').onchange=renderInc;
-$('#us').oninput=$('#usort').onchange=$('#udir').onchange=renderUnits;
-
-// stan dysku z SMART: [stan, opis]
-function smartState(x){
-  const hl=String(x[3]||'').toUpperCase();
-  if(hl&&hl!=='PASSED'&&hl!=='OK')return ['bad','awaria ('+x[3]+')'];
-  if((x[6]||0)>0||(x[7]||0)>0)return ['warn','sektory: '+(x[6]||0)+' przen., '+(x[7]||0)+' oczek.'];
-  return hl?['ok','SMART OK']:['', 'brak danych SMART'];
-}
-// zakres adresu nasluchu
-function pscope(a){
-  a=String(a);
-  if(a==='*'||a==='0.0.0.0'||a==='::')return 'all';
-  if(/^127\.|^::1$|^localhost/.test(a))return 'local';
-  if(/^100\.(6[4-9]|[7-9]\d|1[01]\d|12[0-7])\.|^fd7a:115c:a1e0/i.test(a))return 'ts';
-  return 'lan';
-}
-const PSC={all:'wszystkie interfejsy',local:'tylko lokalnie',ts:'Tailscale',lan:'sieć lokalna / adres'};
-function renderDisks(){
-  const tbl=$('#dtbl');tbl.textContent='';
-  const hd=el('div','tr h');for(const x of ['Maszyna','Punkt montowania','Typ','Zajętość','Źródło / stan'])hd.append(el('span','',x));tbl.append(hd);
-  let n=0;
-  for(const [host,s] of [...D.stat].sort((a,b)=>a[0].localeCompare(b[0]))){
-    for(const d of s.disks.slice().sort((a,b)=>a[0].localeCompare(b[0]))){
-      const r=el('div','tr'),v=d[3]/d[4]*100,c=el('span','vol'),b=el('i');b.style.width=Math.max(1,Math.min(100,v))+'%';if(lvlc(v))b.style.background=lvlc(v)==='e'?'var(--err)':'var(--warn)';
-      c.append(el('span','',pc(v)),b);c.title=gb(d[3])+' / '+gb(d[4]);
-      const m=el('span','',d[0]);m.style.fontFamily='var(--mono)';
-      r.append(el('span','',host),m,el('span','mut',d[1]),c,el('span','mut',gb(d[3])+' / '+gb(d[4])+' · '+d[2]));tbl.append(r);n++;
-    }
-    for(const x of s.smart){
-      const [st,txt]=smartState(x),r=el('div','tr'),c=el('span');c.append(el('span','chip '+(st==='bad'?'bad':st==='warn'?'wrn':'ok'),txt));
-      r.append(el('span','',host),el('span','',x[0]+' · '+(x[1]||'dysk')),el('span','mut',(x[8]||'dysk').toUpperCase()),c,el('span','mut',[x[2]?gb(x[2]/1024):'',x[4]!=null?x[4]+'°C':'',x[5]!=null?num(x[5])+' h pracy':''].filter(Boolean).join(' · ')));tbl.append(r);n++;
-    }
-    for(const p of s.pools){
-      const r=el('div','tr'),ok=p[3]==='ONLINE',v=p[1]?p[2]/p[1]*100:null,c=el('span');c.append(el('span','chip '+(ok?'ok':'bad'),p[3]));
-      r.append(el('span','',host),el('span','','pula ZFS '+p[0]),el('span','mut','ZFS'),c,el('span','mut',v==null?'':pc(v)+' · '+gb(p[2]/1024)+' / '+gb(p[1]/1024)));tbl.append(r);n++;
-    }
-  }
-  if(!n)tbl.append(el('div','n','Brak danych o dyskach. Zaktualizuj agentów (ta sama komenda instalacji).'));
-}
-function renderPorts(){
-  const t=$('#ps').value.trim().toLowerCase(),sc=$('#pscope').value,pr=$('#pproto').value,tbl=$('#ptbl');tbl.textContent='';
-  const hd=el('div','tr h');for(const x of ['Maszyna','Prot.','Adres','Port','Proces','Nasłuchuje na','Zapora ufw'])hd.append(el('span','',x));tbl.append(hd);
-  const rows=[];
-  // czy regula ufw (np. "22/tcp", "10011", "6000:6010/tcp") wpuszcza dany port z calego swiata
-  const ufwOpen=(s,proto,port)=>s.ufw.some(r=>{const m=String(r).match(/^(\d+)(?::(\d+))?(?:\/(tcp|udp))?$/);return m&&(!m[3]||m[3]===proto)&&port>=+m[1]&&port<=+(m[2]||m[1])});
-  for(const [host,s] of D.stat)for(const x of s.ports||[])rows.push({host,proto:x[0],addr:x[1],port:x[2],proc:x[3]||'',sc:pscope(x[1]),
-    fw:!s.ufwState?'':s.ufwState==='inactive'?'off':pscope(x[1])==='local'?'':ufwOpen(s,x[0],x[2])?'open':'closed'});
-  const rs=rows.filter(r=>(!sc||r.sc===sc)&&(!pr||r.proto===pr)&&(!t||(r.host+' '+r.port+' '+r.proc+' '+r.addr).toLowerCase().includes(t)))
-    .sort((a,b)=>a.host.localeCompare(b.host)||a.port-b.port||a.proto.localeCompare(b.proto));
-  for(const r of rs){
-    const row=el('div','tr'),sp=el('span');sp.append(el('span','chip '+(r.sc==='all'?'wrn':r.sc==='local'?'':'ok'),PSC[r.sc]));
-    const pt=el('span','num',r.port);pt.style.fontFamily='var(--mono)';
-    const fw=el('span');if(r.fw)fw.append(el('span','chip '+(r.fw==='open'?'wrn':r.fw==='off'?'bad':'ok'),r.fw==='open'?'otwarty na świat':r.fw==='off'?'ufw wyłączony':'zablokowany'));else fw.append(el('span','mut','–'));
-    row.append(el('span','',r.host),el('span','mut',r.proto.toUpperCase()),el('span','mut',r.addr),pt,el('span','',r.proc||'–'),sp,fw);tbl.append(row);
-  }
-  if(!rs.length)tbl.append(el('div','n',rows.length?'Nic nie pasuje do filtra.':'Brak danych o portach. Zaktualizuj agentów (ta sama komenda instalacji).'));
-}
-$('#ps').oninput=$('#pscope').onchange=$('#pproto').onchange=renderPorts;
-
-// zakladka Zasoby: maszyny, kontenery Docker, goscie Proxmoxa
-function renderRes(){
-  const rows=[];
-  for(const [host,s] of D.stat){
-    const hh=D.hosts.get(host),on=hh?hh.up:true;
-    rows.push({type:'host',name:host,kind:'maszyna',where:'',st:on?(hh&&hh.bad.length?'bad':'up'):'down',stt:on?'agent działa':'brak kontaktu',cpu:s.cpu,cpuT:pc(s.cpu)+' z '+s.cores+' rdz.',ram:s.mem,ramT:s.memT?gb(s.memT-s.memA)+' / '+gb(s.memT):'',note:(s.disks.length?s.disks.length+' dysk. · max '+pc(Math.max(...s.disks.map(d=>d[3]/d[4]*100))):'dysk '+pc(s.disk))+(s.load!=null?' · obc. '+dec(s.load):''),sel:'{host='+quote(host)+'}',meta:{title:host,host,multi:true}});
-    for(const c of s.cmap.values()){
-      const [st,stt]=cstate(c),cpu=fnum(c.cpu),ram=fnum(c.memp);
-      rows.push({type:'ct',name:c.n,kind:'Docker',where:host,st,stt,cpu,cpuT:cpu==null?'–':pc(cpu),ram,ramT:c.mem?String(c.mem).split('/')[0].trim():'',note:c.st||'',sel:selOf({host,source:'docker',unit:c.n}),meta:{title:c.n,host,source:'docker',unit:c.n}});
-    }
-    for(const g of s.guests){
-      const on=g.status==='running',cpu=on?(g.cpu||0)*100:null,ram=on&&g.maxmem?g.mem/g.maxmem*100:null;
-      rows.push({type:'guest',name:g.name||g.id,kind:g.type==='qemu'?'VM':'LXC',where:host+' · '+(g.vmid||''),st:on?'up':'down',stt:g.status||'',cpu,cpuT:cpu==null?'–':pc(cpu)+' z '+(g.maxcpu||'?')+' rdz.',ram,ramT:on&&g.maxmem?gb(g.mem/1024)+' / '+gb(g.maxmem/1024):'',note:on&&g.maxdisk?'dysk '+pc(g.disk/g.maxdisk*100):(g.status||'')});
-    }
-  }
-  const t=$('#rs').value.trim().toLowerCase(),ty=$('#rtype').value,by=$('#rsort').value,tbl=$('#rtbl');
-  const rs=rows.filter(r=>(!ty||r.type===ty)&&(!t||(r.name+' '+r.where).toLowerCase().includes(t)))
-    .sort((a,b)=>by==='name'?a.name.localeCompare(b.name):((b[by]??-1)-(a[by]??-1))||a.name.localeCompare(b.name));
-  tbl.textContent='';
-  const hd=el('div','tr h');for(const x of ['Nazwa','Rodzaj','Gdzie','CPU','RAM','Uwagi'])hd.append(el('span','',x));tbl.append(hd);
-  for(const r of rs){
-    const row=el('div','tr'),n=el('span'),d=el('i',dotc(r.st));d.title=r.stt;n.append(d,el('span','',r.name));n.title=r.name+' · '+r.stt;
-    const cell=(v,txt)=>{const c=el('span','vol'),b=el('i');b.style.width=Math.min(100,Math.max(1,v||0))+'%';if(lvlc(v||0))b.style.background=lvlc(v)==='e'?'var(--err)':'var(--warn)';c.append(el('span','',v==null?'–':pc(v)),b);c.title=txt;return c};
-    row.append(n,el('span','mut',r.kind),el('span','',r.where),cell(r.cpu,r.cpuT),cell(r.ram,r.ramT),el('span','mut',r.note));
-    if(r.sel){row.style.cursor='pointer';row.tabIndex=0;row.onclick=()=>pick(r.sel,r.meta,'');row.onkeydown=x=>{if(x.key==='Enter')row.onclick()}}
-    tbl.append(row);
-  }
-  if(!rs.length)tbl.append(el('div','n',D.stat.size?'Nic nie pasuje do filtra.':'Brak pomiarów. Zaktualizuj agentów (ta sama komenda instalacji), żeby zbierały zasoby.'));
-}
-$('#rs').oninput=$('#rsort').onchange=$('#rtype').onchange=renderRes;
-
-// ------------------------------------------------------------------ uzytkownicy
-async function uapi(path,method,body){
-  if(demo())return demo().users(path,method,body);
-  const r=await fetch('/auth/users'+(path?'/'+encodeURIComponent(path):''),{method:method||'GET',headers:body?{'Content-Type':'application/json'}:{},body:body?JSON.stringify(body):undefined});
-  if(r.status===401){showLogin('Sesja wygasła. Zaloguj się ponownie.');throw new Error('sesja wygasła')}
-  const d=await r.json().catch(()=>({}));
-  if(!r.ok)throw new Error(d.error||('błąd '+r.status));
-  return d;
-}
-// edytor konta: rola, a dla ogladajacego cale maszyny albo pojedyncze zrodla (np. sam TeamSpeak z VPS)
-let UED=null,UEXP=new Set();
-const ukey=(h,src,u)=>h+'\n'+src+'\n'+u;
-function openEditor(u){
-  UED={user:u?u.user:null,role:u?u.role:'viewer',all:u?u.hosts==null:false,hosts:new Set(u&&u.hosts||[]),units:new Set((u&&u.units||[]).map(x=>ukey(...x)))};
-  UEXP=new Set([...UED.units].map(k=>k.split('\n')[0]));
-  $('#ued').hidden=false;$('#ufh').textContent=u?'Edycja konta: '+u.user:'Nowe konto';
-  $('#un').value=u?u.user:'';$('#un').disabled=!!u;$('#uq').value='';
-  $('#usave').textContent=u?'Zapisz zmiany':'Dodaj konto';$('#umsg').textContent='';
-  renderEditor();$('#usersv').scrollTop=0;if(!u)$('#un').focus();
-}
-function closeEditor(){UED=null;$('#ued').hidden=true}
-function renderEditor(){
-  for(const b of $('#urole').children)b.classList.toggle('on',b.dataset.v===UED.role);
-  for(const b of $('#uscope').children)b.classList.toggle('on',b.dataset.v===(UED.all?'all':'sel'));
-  const adm=UED.role==='admin';
-  $('#uroleh').textContent=adm?'Administrator widzi wszystko i zarządza kontami, powiadomieniami i stroną statusu.':'Oglądający tylko przegląda logi i stan tego, co mu udostępnisz.';
-  $('#uacc').hidden=adm;$('#upick').hidden=UED.all;$('#uallh').hidden=!UED.all;
-  if(!adm&&!UED.all)renderPick();
-}
-// drzewo: maszyny (kontenery pod swoim hostem), po rozwinieciu ich zrodla pogrupowane jak w panelu bocznym
-function renderPick(){
-  const box=$('#uhp'),q=$('#uq').value.trim().toLowerCase(),sc=box.scrollTop;box.textContent='';
-  const names=new Set(D.hosts.keys());for(const h of UED.hosts)names.add(h);for(const k of UED.units)names.add(k.split('\n')[0]);
-  const srcOf=h=>{
-    const m=new Map();for(const u of (D.hosts.get(h)||{units:[]}).units)if(u.source!=='stat')m.set(ukey(h,u.source,u.unit),u);
-    for(const k of UED.units){const [hh,s2,u2]=k.split('\n');if(hh===h&&!m.has(k))m.set(k,{host:h,source:s2,unit:u2,gone:true})}
-    return [...m.values()];
-  };
-  const match=(h,list)=>!q||h.toLowerCase().includes(q)||list.some(u=>u.unit.toLowerCase().includes(q));
-  const roots=[...names].filter(n=>{const hh=D.hosts.get(n);return !hh||!hh.parent||!names.has(hh.parent)}).sort();
-  let shown=0;
-  const row=(h,kid)=>{
-    const list=srcOf(h);if(!match(h,list))return;shown++;
-    const whole=UED.hosts.has(h),picked=list.filter(u=>UED.units.has(ukey(h,u.source,u.unit))).length,open=UEXP.has(h)||(!!q&&!h.toLowerCase().includes(q));
-    const r=el('div','ph'+(kid?' kid':'')),ex=el('button','exp'+(open?' open':''),'›'),lb=el('label'),cb=el('input');
-    ex.disabled=!list.length;ex.title='pokaż źródła';ex.onclick=()=>{UEXP.has(h)?UEXP.delete(h):UEXP.add(h);renderPick()};
-    cb.type='checkbox';cb.checked=whole;cb.indeterminate=!whole&&picked>0;
-    cb.onchange=()=>{
-      if(cb.checked){UED.hosts.add(h);if(!kid)for(const k of family(h).slice(1))UED.hosts.add(k)}
-      else{UED.hosts.delete(h);if(!kid)for(const k of family(h).slice(1))UED.hosts.delete(k)}
-      renderPick();
-    };
-    lb.append(cb,el('b','',h));
-    const info=whole?'cała maszyna':picked?picked+' z '+list.length+' źródeł':list.length?list.length+' źródeł':D.hosts.has(h)?'':'brak danych';
-    r.append(ex,lb,el('span','mut',info));box.append(r);
-    if(open&&list.length){
-      const pu=el('div','pu'+(kid?' kid':''));let grp='';
-      const items=list.filter(u=>!q||h.toLowerCase().includes(q)||u.unit.toLowerCase().includes(q)).sort((a,b)=>(a.source+a.unit).localeCompare(b.source+b.unit));
-      for(const u of items){
-        if(u.source!==grp){grp=u.source;pu.append(el('div','lbl',SRC[grp]||grp))}
-        const k=ukey(h,u.source,u.unit),l=el('label',whole?'imp':''),c=el('input');c.type='checkbox';
-        c.checked=whole||UED.units.has(k);c.disabled=whole;c.onchange=()=>{c.checked?UED.units.add(k):UED.units.delete(k);renderPick()};
-        l.title=whole?'cała maszyna jest zaznaczona':u.unit;l.append(c,el('span','',short(u.unit)+(u.gone?' (brak logów)':'')));pu.append(l);
-      }
-      box.append(pu);
-    }
-  };
-  for(const r of roots){row(r,false);for(const k of family(r).slice(1))if(names.has(k))row(k,true)}
-  if(!shown)box.append(el('div','n',q?'Nic nie pasuje do „'+q+'”.':'Brak maszyn. Najpierw dodaj agenta na jakiejś maszynie.'));
-  box.scrollTop=sc;
-  const nh=UED.hosts.size,nu=[...UED.units].filter(k=>!UED.hosts.has(k.split('\n')[0])).length;
-  $('#usum').textContent=!nh&&!nu?'Nic nie jest zaznaczone: konto nie zobaczy żadnych logów.':'Widzi: '+(nh?nh+' '+pl(nh,'całą maszynę','całe maszyny','całych maszyn'):'')+(nh&&nu?' i ':'')+(nu?nu+' '+pl(nu,'pojedyncze źródło','pojedyncze źródła','pojedynczych źródeł'):'')+'. Cała maszyna obejmuje też jej stan, zasoby i źródła dodane później; pojedyncze źródło to tylko jego logi.';
-}
-for(const b of $('#urole').children)b.onclick=()=>{UED.role=b.dataset.v;renderEditor()};
-for(const b of $('#uscope').children)b.onclick=()=>{UED.all=b.dataset.v==='all';renderEditor()};
-$('#uq').oninput=renderPick;
-$('#uexp').onclick=()=>{const all=[...D.hosts.keys()];if(all.every(h=>UEXP.has(h))){UEXP.clear();$('#uexp').textContent='rozwiń wszystko'}else{UEXP=new Set(all);$('#uexp').textContent='zwiń wszystko'}renderPick()};
-$('#uclr').onclick=()=>{UED.hosts.clear();UED.units.clear();renderPick()};
-$('#unew').onclick=()=>openEditor(null);
-$('#ucancel').onclick=closeEditor;
-function showPw(user,pw,isNew){
-  const b=$('#upw');b.hidden=false;b.textContent='';
-  const r1=el('div','row'),r2=el('div','row'),cp=el('button','','Kopiuj'),x=el('button','','Zamknij');
-  cp.onclick=()=>copyText('Login: '+user+'\nHasło: '+pw,cp);x.onclick=()=>{b.hidden=true};
-  r1.append(el('b','',isNew?'Konto utworzone':'Nowe hasło dla '+user));
-  r2.append('Login',el('code','',user),'Hasło',el('code','',pw),cp,x);
-  b.append(r1,r2,el('div','mut','Przekaż te dane bezpiecznie, hasło nie pokaże się ponownie. Przy pierwszym logowaniu użytkownik włączy 2FA.'));
-  $('#usersv').scrollTop=0;
-}
-$('#usave').onclick=async()=>{
-  const m=$('#umsg');m.style.color='';m.textContent='Zapisuję…';
-  const body={role:UED.role,hosts:UED.role==='admin'||UED.all?'all':[...UED.hosts],
-    units:UED.role==='admin'||UED.all?[]:[...UED.units].map(k=>k.split('\n')).filter(x=>!UED.hosts.has(x[0]))};
-  try{
-    if(UED.user){await uapi(UED.user,'PUT',body);closeEditor();flashU('Zapisano zmiany konta. Działają od razu.')}
-    else{const r=await uapi('','POST',Object.assign({user:$('#un').value.trim()},body));closeEditor();showPw(r.user,r.password,true)}
-    loadUsers();
-  }catch(e){m.style.color='var(--err)';m.textContent='Nie zapisano: '+e.message}
-};
-function flashU(t){const b=$('#upw');b.hidden=false;b.textContent='';const r=el('div','row'),x=el('button','','Zamknij');x.onclick=()=>{b.hidden=true};r.append(el('span','',t),x);b.append(r);setTimeout(()=>{if(b.contains(r))b.hidden=true},4000)}
-// skrot dostepu w liscie kont
-function accessChips(u){
-  const sc=el('span','sc');
-  if(u.role==='admin'||u.hosts==null){sc.append(el('span','chip ok','wszystko'));return sc}
-  const items=[...u.hosts.map(h=>[h+' · cała','chip']),...(u.units||[]).map(x=>[x[0]+' › '+short(x[2]),'chip'])];
-  if(!items.length){sc.append(el('span','chip bad','nic'));return sc}
-  for(const [t,c] of items.slice(0,5)){const x=el('span',c,t);x.title=t;sc.append(x)}
-  if(items.length>5){const x=el('span','chip','+'+(items.length-5));x.title=items.slice(5).map(i=>i[0]).join('\n');sc.append(x)}
-  return sc;
-}
-function confirmBtn(b,label,fn){
-  b.onclick=async()=>{
-    if(b.dataset.ok!=='1'){b.dataset.ok='1';const o=b.textContent;b.textContent=label;b.style.color='var(--err)';setTimeout(()=>{if(b.isConnected){b.dataset.ok='';b.textContent=o;b.style.color=''}},4000);return}
-    b.disabled=true;try{await fn()}catch(e){b.disabled=false;flashU('Nie udało się: '+e.message)}
-  };
-}
-async function loadUsers(){
-  if(!me||me.role!=='admin')return;
-  const box=$('#ulist');
-  try{
-    const {users}=await uapi('');
-    box.textContent='';
-    const hd=el('div','urow h');for(const x of ['Konto','Rola','Co widzi','2FA',''])hd.append(el('span','',x));box.append(hd);
-    for(const u of users){
-      const r=el('div','urow'),nm=el('span','nm',u.user);if(u.user===me.user)nm.append(el('span','chip','Ty'));
-      const acts=el('span','acts'),be=el('button','','Edytuj'),bp=el('button','','Nowe hasło'),b2=el('button','','Reset 2FA'),bd=el('button','','Usuń');
-      be.onclick=()=>openEditor(u);
-      confirmBtn(bp,'Na pewno nowe hasło?',async()=>{const x=await uapi(u.user,'PUT',{new_password:true});showPw(u.user,x.password,false);loadUsers()});
-      confirmBtn(b2,'Na pewno reset 2FA?',async()=>{await uapi(u.user,'PUT',{reset_2fa:true});flashU('2FA zresetowane: '+u.user+' ustawi je przy następnym logowaniu.');loadUsers()});
-      confirmBtn(bd,'Na pewno usunąć?',async()=>{await uapi(u.user,'DELETE');if(UED&&UED.user===u.user)closeEditor();flashU('Usunięto konto '+u.user+'.');loadUsers()});
-      if(u.user===me.user)bd.disabled=true,bd.title='nie można usunąć własnego konta';
-      acts.append(be,bp,b2,bd);
-      r.append(nm,el('span','mut',u.role==='admin'?'administrator':'oglądający'),accessChips(u),(()=>{const t=el('span',u.totp?'':'mut');t.append(el('span','m','2FA: '),u.totp?'włączone':'przy 1. logowaniu');return t})(),acts);box.append(r);
-    }
-  }catch(e){box.textContent='';box.append(el('div','n','Nie udało się wczytać kont: '+e.message))}
-}
-
-// ------------------------------------------------------------------ powiadomienia
-async function napi(path,method,body){
-  if(demo())return demo().notify(path,method,body);
-  const r=await fetch('/api/notify/'+path,{method:method||'GET',headers:body?{'Content-Type':'application/json'}:{},body:body?JSON.stringify(body):undefined});
-  if(r.status===401){showLogin('Sesja wygasła. Zaloguj się ponownie.');throw new Error('sesja wygasła')}
-  const d=await r.json().catch(()=>({}));
-  if(!r.ok)throw new Error(d.error||('błąd '+r.status));
-  return d;
-}
-const RULES=[['host_offline','Serwer bez kontaktu z centralą',[['minutes','po',' min']]],['service_down','Padnięty kontener Dockera lub usługa systemd',[]],['cron_failed','Zadanie cron zakończone błędem',[]],
-  ['disk','Zapełniony dysk (każdy osobno)',[['pct','od','%']]],['disk_health','Awaria dysku (SMART) lub pula ZFS nie w stanie ONLINE',[]],['ports','Nowy port otwarty na świat w zaporze ufw (jedno powiadomienie na zmianę)',[]],['cpu','Wysokie CPU',[['pct','od','%'],['minutes','średnio przez',' min']]],['mem','Wysoki RAM',[['pct','od','%'],['minutes','średnio przez',' min']]],
-  ['errors','Dużo błędów w logach jednego źródła',[['count','od',' błędów'],['minutes','w ciągu',' min']]]];
-const CHT={ntfy:['ntfy',[['url','Adres tematu, np. https://ntfy.sh/twoj-temat'],['token','Token (opcjonalnie)']]],telegram:['Telegram',[['bot_token','Token bota (od @BotFather)'],['chat_id','Chat ID']]],
-  discord:['Discord',[['url','Adres webhooka kanału']]],webhook:['Webhook',[['url','Adres (POST z JSON)']]],email:['E-mail',[['host','Serwer SMTP'],['port','Port (587 albo 465)'],['user','Login'],['password','Hasło'],['from','Nadawca'],['to','Odbiorca']]]};
-let NC=null,ndirty=false;
-function alertRow(a,hist){
-  const ev=a.since&&a.since===a.until,r=el('div','al '+(hist&&!ev?'ok':a.sev||'error')),d=el('div');
-  d.append(el('b','',a.title));if(a.detail)d.append(el('small','',a.detail));
-  const t=el('time','',hist?(ev?rel(a.since*1e3):'minęło '+rel(a.until*1e3)+(a.since?' · trwało '+dur(Math.max(60,a.until-a.since)):'')):'od '+rel(a.since*1e3).replace(' temu',''));
-  r.append(d,t);
-  if(a.host&&D.hosts.has(a.host)){
-    r.classList.add('click');r.tabIndex=0;
-    const u=D.units.find(x=>x.host===a.host&&x.unit===a.unit);
-    r.onclick=()=>u?pick(u.sel,{title:short(u.unit),host:u.host,source:u.source,unit:u.unit},''):pick('{host='+quote(a.host)+'}',{title:a.host,host:a.host,multi:true},'');
-    r.onkeydown=x=>{if(x.key==='Enter')r.onclick()};
-  }
-  return r;
-}
-async function loadNotif(full){
-  if(!me)return;
-  try{
-    const s=await napi('state');
-    const n=s.active.length;$('#nnot').hidden=!n;$('#nnot').textContent=n;
-    if(view!=='notif')return;
-    const act=$('#nact'),hist=$('#nhist');act.textContent='';hist.textContent='';
-    for(const a of s.active)act.append(alertRow(a,false));
-    if(!n)act.append(el('div','n','Brak aktywnych problemów.'));
-    for(const a of s.history.slice(0,60))hist.append(alertRow(a,true));
-    if(!s.history.length)hist.append(el('div','n','Jeszcze nic się nie wydarzyło.'));
-    $('#nsub').textContent=(s.error?s.error+' ':'')+'Ostatnie sprawdzenie: '+(s.checked_at?rel(s.checked_at*1e3):'jeszcze nie było')+'. '+(s.channels?'Kanały powiadomień: '+s.channels+'.':'Nie ustawiono żadnego kanału, więc powiadomienia widać tylko tutaj.');
-    if(me.role==='admin'&&full&&!ndirty){NC=await napi('config');renderNset()}
-    $('#nset').hidden=me.role!=='admin';
-  }catch(e){if(view==='notif')$('#nsub').textContent='Nie udało się wczytać powiadomień: '+e.message}
-}
-function renderNset(){
-  const box=$('#nrules');box.textContent='';
-  for(const [k,label,fields] of RULES){
-    const r=NC.rules[k],row=el('div','rule'),cb=el('input');cb.type='checkbox';cb.checked=r.on;cb.id='r_'+k;cb.onchange=()=>{r.on=cb.checked;ndirty=true};
-    const lb=el('label','',label);lb.htmlFor=cb.id;const nums=el('span','nums');
-    for(const [f,pre,post] of fields){const i=el('input');i.type='number';i.min=1;i.value=r[f];i.setAttribute('aria-label',label+' '+pre);i.oninput=()=>{r[f]=+i.value||1;ndirty=true};nums.append(el('span','',pre),i,el('span','',post.trim()))}
-    row.append(cb,lb,nums);box.append(row);
-  }
-  $('#nres').checked=NC.notify_resolved;$('#nrep').value=NC.repeat_hours;
-  const chs=$('#nchs');chs.textContent='';
-  NC.channels.forEach((c,ix)=>{
-    const [nm,fields]=CHT[c.type],w=el('div','chn'),top=el('div','top'),on=el('input'),del=el('button','','Usuń');
-    on.type='checkbox';on.checked=c.on!==false;on.title='włączony';on.onchange=()=>{c.on=on.checked;ndirty=true};
-    del.onclick=()=>{NC.channels.splice(ix,1);ndirty=true;renderNset()};
-    const name=el('input');name.placeholder='nazwa (opcjonalnie)';name.value=c.name||'';name.oninput=()=>{c.name=name.value;ndirty=true};
-    top.append(on,el('b','',nm),name,del);w.append(top);
-    for(const [f,label] of fields){
-      const l=el('label','',label),i=el('input');i.value=c[f]||'';if(/token|password/.test(f))i.type='password';i.autocomplete='off';
-      i.oninput=()=>{c[f]=i.value;ndirty=true};l.append(i);w.append(l);
-    }
-    chs.append(w);
-  });
-  if(!NC.channels.length)chs.append(el('div','mut','Brak kanałów. Najprościej: ntfy, czyli darmowa aplikacja na telefon (ntfy.sh); wymyśl nazwę tematu i wpisz ją tutaj i w aplikacji.'));
-}
-$('#nadd').onchange=e=>{const t=e.target.value;if(!t)return;NC.channels.push({type:t,on:true});e.target.value='';ndirty=true;renderNset()};
-$('#nres').onchange=e=>{NC.notify_resolved=e.target.checked;ndirty=true};
-$('#nrep').oninput=e=>{NC.repeat_hours=+e.target.value||0;ndirty=true};
-$('#nsave').onclick=async()=>{
-  const m=$('#nmsg');m.style.color='';m.textContent='Zapisuję…';
-  try{NC=await napi('config','PUT',NC);ndirty=false;renderNset();m.style.color='var(--acc)';m.textContent='Zapisano.';loadNotif()}
-  catch(e){m.style.color='var(--err)';m.textContent='Nie zapisano: '+e.message}
-};
-$('#ntest').onclick=async()=>{
-  const m=$('#nmsg');m.style.color='';
-  if(ndirty){m.style.color='var(--warn)';m.textContent='Najpierw zapisz ustawienia.';return}
-  m.textContent='Wysyłam…';
-  try{const r=await napi('test','POST',{});m.style.color=r.results.every(x=>x.ok)?'var(--acc)':'var(--err)';
-    m.textContent=r.results.length?r.results.map(x=>(x.channel)+': '+(x.ok?'wysłano':'błąd ('+x.error+')')).join(' · '):'Brak włączonych kanałów.'}
-  catch(e){m.style.color='var(--err)';m.textContent='Nie wysłano: '+e.message}
-};
-
-// ------------------------------------------------------------- dodawanie maszyn
-let INS=null;
-async function loadAdd(){
-  if(!INS){try{INS=await napi('install')}catch(e){$('#amsg').textContent='Nie udało się pobrać danych centrali: '+e.message;return}}
-  renderAdd();
-}
-function renderAdd(){
-  if(!INS)return;
-  const raw='https://raw.githubusercontent.com/'+INS.repo+'/main/install.sh',nm=$('#aname').value.trim().replace(/[^A-Za-z0-9._-]/g,'');
-  const N=nm?' --name '+nm:'',S=$('#asudo').checked?'sudo ':'',lan=INS.lan||'http://IP-CENTRALI:8080',sh='curl -fsSL '+raw+' | '+S+'bash -s --';
-  $('#amsg').textContent=INS.lan?'':'Centrala nie podała swojego adresu w sieci lokalnej. Zaktualizuj ją (loghub hub) albo wpisz adres ręcznie zamiast IP-CENTRALI.';
-  $('#avps').hidden=!INS.ts;
-  const C={
-    lan:sh+' agent --hub '+lan+' --token '+INS.token+' --no-tailscale'+N,
-    vps:INS.ts?sh+' agent --hub '+INS.ts+' --hub-lan '+lan+' --token '+INS.token+N:'',
-    pve:'curl -fsSL '+raw+' | bash -s -- agent --hub '+lan+' --token '+INS.token+' --no-tailscale'+N,
-    gavm:S+'apt-get install -y qemu-guest-agent && '+S+'systemctl start qemu-guest-agent',
-    gahost:'qm set ID --agent enabled=1 && qm shutdown ID && qm start ID',
-    gachk:'qm agent ID ping && echo "guest agent odpowiada"',
-    harepo:'https://github.com/'+INS.repo,hahub:lan,hatok:INS.token,haname:nm||'haos',
-    del:sh+' uninstall-agent'};
-  for(const box of document.querySelectorAll('#addv .cmd')){
-    const t=C[box.dataset.k]||'';box.textContent='';
-    const c=el('code','',t),b=el('button','','Kopiuj');b.onclick=()=>copyText(t,b);box.append(c,b);
-  }
-}
-async function copyText(t,b){
-  let ok=false;
-  try{if(navigator.clipboard&&isSecureContext){await navigator.clipboard.writeText(t);ok=true}}catch{}
-  if(!ok){const ta=el('textarea');ta.value=t;ta.style.cssText='position:fixed;top:0;left:0;opacity:0';document.body.append(ta);ta.select();try{ok=document.execCommand('copy')}catch{}ta.remove()}
-  const o=b.textContent;b.textContent=ok?'Skopiowano':'Zaznacz ręcznie';setTimeout(()=>{b.textContent=o},1600);
-}
-$('#aname').oninput=renderAdd;$('#asudo').onchange=renderAdd;
-
-// ------------------------------------------------------------- strona statusu
-let SC={title:'',components:[],states:{}};
-async function loadStat(){
-  $('#sprev').hidden=!!demo();
-  try{SC=await napi('status');SC.components=SC.components||[];renderStat()}catch(e){$('#smsg').textContent=e.message}
-}
-function renderStat(){
-  $('#stitle').value=SC.title||'';
-  const box=$('#scomps');box.textContent='';
-  if(!SC.components.length)box.append(el('div','mut','Nie ma jeszcze żadnych usług. Dodaj pierwszą, np. „TeamSpeak” podpięty pod usługę teamspeak.service na VPS.'));
-  SC.components.forEach((c,i)=>box.append(statRow(c,i)));
-}
-function statRow(c,i){
-  const r=el('div','srow');
-  const nm=el('input');nm.placeholder='nazwa na stronie, np. TeamSpeak';nm.maxLength=60;nm.value=c.name||'';nm.oninput=()=>{c.name=nm.value};
-  const gr=el('input');gr.placeholder='grupa (opcjonalnie)';gr.maxLength=40;gr.value=c.group||'';gr.oninput=()=>{c.group=gr.value};
-  const ty=el('select');for(const [v,l] of [['docker','kontener Docker'],['unit','usługa systemd'],['host','cały serwer']])ty.append(new Option(l,v));ty.value=c.type||'docker';
-  const ho=el('select');ho.append(new Option('maszyna…',''));for(const n of [...D.hosts.keys()].sort())ho.append(new Option(n,n));if(c.host&&!D.hosts.has(c.host))ho.append(new Option(c.host,c.host));ho.value=c.host||'';
-  const ta=el('select');
-  const fill=()=>{
-    ta.textContent='';ta.style.visibility=c.type==='host'?'hidden':'';
-    const s=D.stat.get(c.host);let opts=s?(c.type==='docker'?[...s.cmap.keys()]:[...s.umap.keys()].filter(n=>/\.service$/.test(n))):[];
-    opts.sort();if(c.target&&!opts.includes(c.target))opts.unshift(c.target);
-    ta.append(new Option(c.type==='docker'?'kontener…':'usługa…',''));for(const o of opts)ta.append(new Option(o,o));ta.value=c.target||'';
-  };
-  fill();
-  ty.onchange=()=>{c.type=ty.value;c.target='';fill()};
-  ho.onchange=()=>{c.host=ho.value;c.target='';fill()};
-  ta.onchange=()=>{c.target=ta.value};
-  const st=(SC.states||{})[c.id],chip=el('span','chip '+(st==='ok'?'ok':st==='partial'?'wrn':st==='down'?'bad':''),st==='ok'?'działa':st==='partial'?'z problemem':st==='down'?'nie działa':'nowa');
-  chip.title='stan teraz (odświeża się co minutę po zapisaniu)';
-  const up=el('button','','↑'),dn=el('button','','↓'),rm=el('button','','✕');
-  up.title='wyżej';dn.title='niżej';rm.title='usuń z listy';up.disabled=!i;dn.disabled=i===SC.components.length-1;
-  const mv=d=>{const a=SC.components;[a[i],a[i+d]]=[a[i+d],a[i]];renderStat()};
-  up.onclick=()=>mv(-1);dn.onclick=()=>mv(1);rm.onclick=()=>{SC.components.splice(i,1);renderStat()};
-  r.append(nm,gr,ty,ho,ta,chip,up,dn,rm);
-  return r;
-}
-$('#sadd').onclick=()=>{SC.components.push({name:'',group:'',type:'docker',host:'',target:''});renderStat();const ins=$('#scomps').querySelectorAll('.srow input');if(ins.length)ins[ins.length-2].focus()};
-$('#stitle').oninput=()=>{SC.title=$('#stitle').value};
-$('#ssave').onclick=async()=>{
-  const m=$('#smsg');m.style.color='';m.textContent='Zapisuję…';
-  try{const st=SC.states;SC=await napi('status','PUT',{title:SC.title,components:SC.components});SC.states=Object.assign({},st,SC.states||{});renderStat();m.style.color='var(--acc)';m.textContent='Zapisano. Strona publiczna pokaże zmiany w ciągu minuty.'}
-  catch(e){m.style.color='var(--err)';m.textContent=e.message}
-};
-
-// ------------------------------------------------------------------ zadania cron
-// uruchomienia: zrodlo "cron" (jeden wpis na uruchomienie, z kodem wyjscia); lista zadan: zrodlo "crondef"
-async function loadCron(){
-  const jobs=new Map(),jk=(h,u)=>h+'\n'+u;
-  for(const u of D.units.filter(u=>u.source==='cron'))jobs.set(jk(u.host,u.unit),{host:u.host,unit:u.unit,sel:u.sel,c24:u.c24,e24:u.e24,runs:[],def:null});
-  I.cronT=Date.now();
-  try{
-    if(!I.defs||Date.now()-I.defsT>10*6e4){I.defs=parseLines(await(await api('query',{query:'{source="crondef"} _time:100d',limit:1000})).text());I.defsT=Date.now()}
-    const defs=I.defs,scan={};
-    for(const d of defs)scan[d.host]=Math.max(scan[d.host]||0,+d.cron_scan||0);
-    for(const d of defs){
-      if((+d.cron_scan||0)!==scan[d.host])continue;
-      const k=jk(d.host,d.unit),j=jobs.get(k)||jobs.set(k,{host:d.host,unit:d.unit,sel:selOf({host:d.host,source:'cron',unit:d.unit}),c24:0,e24:0,runs:[]}).get(k);
-      j.def=d;
-    }
-  }catch{}
-  // ostatnie uruchomienia wszystkich zadan jednym zapytaniem (po 20 na zadanie)
-  let runs=null;
-  try{runs=parseLines(await(await api('query',{query:'{source="cron"} _time:30d | sort by (_time desc) limit 20 partition by (host, unit)'})).text())}catch{}
-  if(runs){
-    for(const o of runs){
-      if(!o.host)continue;
-      const k=jk(o.host,o.unit),j=jobs.get(k)||jobs.set(k,{host:o.host,unit:o.unit,sel:selOf({host:o.host,source:'cron',unit:o.unit}),c24:0,e24:0,runs:[]}).get(k);
-      j.runs.push(o);
-    }
-    for(const j of jobs.values())j.runs=j.runs.sort((a,b)=>a._time<b._time?1:-1).slice(0,20);
-  }else await Promise.all([...jobs.values()].slice(0,80).map(async j=>{
-    try{j.runs=parseLines(await(await api('query',{query:j.sel+' _time:30d',limit:20})).text()).sort((a,b)=>a._time<b._time?1:-1)}catch{}
-  }));
-  C=[...jobs.values()];window.C_ALL=C;
-  for(const j of C){j.last=j.runs[0]||null;j.bad=!!j.last&&j.last.cron_state!=='ok'}
-  const bad=C.filter(j=>j.bad).length;$('#ncron').hidden=!bad;$('#ncron').textContent=bad;
-  renderCron();const sc=tree.scrollTop;renderTree();tree.scrollTop=sc;
-}
-const DOWL=['niedziele','poniedziałki','wtorki','środy','czwartki','piątki','soboty','niedziele'],DOWG=['niedzieli','poniedziałku','wtorku','środy','czwartku','piątku','soboty','niedzieli'];
-const MONG=['stycznia','lutego','marca','kwietnia','maja','czerwca','lipca','sierpnia','września','października','listopada','grudnia'];
-function dowPl(x){
-  if(x==='1-5')return 'w dni robocze';
-  if(x==='0,6'||x==='6,0'||x==='6-7'||x==='6,7')return 'w weekendy';
-  if(/^[0-7](,[0-7])*$/.test(x))return 'w '+x.split(',').map(d=>DOWL[+d]).join(', ');
-  if(/^[0-7]-[0-7]$/.test(x)){const [a,b]=x.split('-');return 'od '+DOWG[a]+' do '+DOWG[b]}
-  return null;
-}
-// harmonogram crona po polsku; null, gdy wyrazenie jest zbyt nietypowe
-function cronPl(s){
-  const at={'@reboot':'przy starcie systemu','@hourly':'co godzinę','@daily':'codziennie o 00:00','@midnight':'codziennie o 00:00','@weekly':'w niedziele o 00:00','@monthly':'1. dnia miesiąca o 00:00','@yearly':'1 stycznia o 00:00','@annually':'1 stycznia o 00:00'};
-  if(!s)return null;
-  if(at[s])return at[s][0].toUpperCase()+at[s].slice(1);
-  const f=s.trim().split(/\s+/);if(f.length!==5)return null;
-  const [mi,ho,dm,mo,dw]=f,isN=x=>/^\d+$/.test(x);let when,days='';
-  if(mi==='*'&&ho==='*')when='co minutę';
-  else if(/^\*\/\d+$/.test(mi)&&ho==='*')when='co '+mi.slice(2)+' min';
-  else if(/^\d+-\d+\/\d+$/.test(mi)&&ho==='*'){const [r,st]=mi.split('/'),[a,b]=r.split('-');when='co '+st+' min (od '+a+'. do '+b+'. minuty)'}
-  else if(/^\d+(,\d+)+$/.test(mi)&&ho==='*')when='co godzinę, w minutach '+mi.split(',').join(', ');
-  else if(isN(mi)&&ho==='*')when=+mi?'co godzinę, w '+mi+'. minucie':'co pełną godzinę';
-  else if(isN(mi)&&/^\*\/\d+$/.test(ho))when='co '+ho.slice(2)+' godz., w '+mi+'. minucie';
-  else if(isN(mi)&&/^\d+(,\d+)*$/.test(ho))when='o '+ho.split(',').map(x=>pad(x)+':'+pad(mi)).join(' i ');
-  else if(isN(mi)&&/^\d+-\d+$/.test(ho)){const [a,b]=ho.split('-');when='co godzinę od '+pad(a)+':'+pad(mi)+' do '+pad(b)+':'+pad(mi)}
-  else return null;
-  if(dm==='*'&&mo==='*'&&dw==='*')days=when.startsWith('o ')?'codziennie':'';
-  else if(dm==='*'&&mo==='*'){days=dowPl(dw);if(!days)return null}
-  else if(/^\d+(,\d+)*$/.test(dm)&&mo==='*'&&dw==='*')days=dm.split(',').join(', ')+'. dnia miesiąca';
-  else if(isN(dm)&&isN(mo)&&dw==='*'&&+mo>=1&&+mo<=12)days=dm+' '+MONG[mo-1];
-  else return null;
-  const out=(days?days+' ':'')+when;
-  return out[0].toUpperCase()+out.slice(1);
-}
-const dur=s=>s==null||s===''?'':s<90?s+' s':s<5400?Math.round(s/60)+' min':dec(s/3600)+' godz.';
-function showCron(host){cronHost=host;renderCron();show('cron');if(Date.now()-I.cronT>6e4)loadCron()}
-function renderCron(){
-  const t=$('#cs').value.trim().toLowerCase(),f=$('#cf').value,tiles=$('#ctiles'),tbl=$('#ctbl');
-  const fam=cronHost?family(cronHost):null,C=fam?window.C_ALL.filter(j=>fam.includes(j.host)):window.C_ALL;
-  $('#ctitle').textContent=cronHost?'Zadania cron: '+cronHost:'Zadania cron';
-  $('#csub').textContent=cronHost?(fam.length>1?'Ta maszyna i jej kontenery ('+fam.slice(1).join(', ')+').':'Ta maszyna.')+' Wszystkie maszyny: „Zadania cron” w menu.':'Ostatnie uruchomienia, kody wyjścia i harmonogramy ze wszystkich maszyn.';
-  const bad=C.filter(j=>j.bad).length,never=C.filter(j=>!j.last).length;
-  tiles.textContent='';
-  for(const [v,l,c] of [[C.length,'zadań',''],[C.length-bad-never,'ostatnio zakończone poprawnie','g'],[bad,'z błędem w ostatnim uruchomieniu',bad?'e':''],[num(sum(C.map(j=>j.c24))),'uruchomień w 24 h',''],[num(sum(C.map(j=>j.e24))),'nieudanych w 24 h',sum(C.map(j=>j.e24))?'e':'']]){
-    const d=el('div',c);d.append(el('b','',v),el('span','mut',l));tiles.append(d);
-  }
-  const js=C.filter(j=>(!t||(j.host+' '+j.unit).toLowerCase().includes(t))&&(!f||(f==='bad'?j.bad:!j.last)))
-    .sort((a,b)=>b.bad-a.bad||(b.last?Date.parse(b.last._time):0)-(a.last?Date.parse(a.last._time):0)||a.unit.localeCompare(b.unit));
-  tbl.textContent='';
-  const hd=el('div','tr h');for(const x of ['Stan','Zadanie','Serwer','Harmonogram','Ostatnie uruchomienie','Kod','Historia'])hd.append(el('span','',x));tbl.append(hd);
-  for(const j of js){
-    const r=el('div','tr'),L=j.last,d=j.def,st=el('span');
-    st.append(el('span','chip '+(!L?'':j.bad?'bad':'ok'),!L?'nie uruchomione':L.cron_state==='ok'?'OK':L.cron_state==='signal'?'przerwane':'błąd'));
-    const job=el('span','job'),cmd=el('b','',(L&&L.cron_cmd)||(d&&d.cron_cmd)||j.unit);cmd.title=cmd.textContent;
-    job.append(cmd,el('small','',[(L&&L.cron_user)||(d&&d.cron_user),d?d.cron_file:'usunięte z crontaba'].filter(Boolean).join(' · ')));
-    const when=el('span','job');
-    if(L){const dt=new Date(L._time);when.append(el('span','',rel(+dt)),el('small','',[fmt(dt),dur(L.duration_s)].filter(Boolean).join(' · ')));when.title=dt.toLocaleString('sv')}
-    else when.append(el('span','mut','–'));
-    const code=el('span','num',L?String(L.exit_code??''):'–');if(j.bad)code.style.color='var(--err)';
-    const hist=el('span','hist');
-    for(const x of j.runs.slice().reverse()){const b=el('i',x.cron_state==='ok'?'':'e'),xd=new Date(x._time);b.title=fmt(xd)+' · '+(x.cron_state==='ok'?'OK':'kod '+x.exit_code)+(x.duration_s!=null?' · '+dur(x.duration_s):'');hist.append(b)}
-    const sch=el('span','job');if(d){const w=cronPl(d.cron_sched);sch.append(el('span','',w||d.cron_sched),el('small','',w?d.cron_sched:'nietypowy zapis'));sch.querySelector('small').style.fontFamily='var(--mono)'}else sch.append(el('span','mut','–'));
-    r.append(st,job,el('span','',j.host),sch,when,code,hist);
-    r.tabIndex=0;r.onclick=()=>pick(j.sel,{title:short(j.unit),host:j.host,source:'cron',unit:j.unit},'','30d');
-    r.onkeydown=x=>{if(x.key==='Enter')r.onclick()};
-    tbl.append(r);
-  }
-  if(!js.length)tbl.append(el('div','n',C.length?'Żadne zadanie nie pasuje do filtra.':'Brak zadań cron. Agent zbiera je z maszyn z cronem z Debiana, Ubuntu lub Proxmoxa.'));
-}
-$('#cs').oninput=$('#cf').onchange=renderCron;
-
-// ------------------------------------------------------------------------ logi
-function pick(sel,meta,lvl,range,win){
-  cur={sel,meta,win:win||null};
-  if(lvl!=null)$('#lvl').value=lvl;
-  const rs=$('#range');let wo=rs.querySelector('option[value=win]');
-  if(win){if(!wo){wo=new Option('','win');rs.append(wo)}wo.textContent=winLabel(win[0],win[1]);rs.value='win'}
-  else{if(wo){wo.remove();if(!range)rs.value='1h'}if(range)rs.value=range}
-  syncDay();
-  const t=$('#title');t.textContent='';
-  const us=matching(),hh=meta.host?D.hosts.get(meta.host):null,st=meta.unit?(us[0]&&us[0].st):hh?(hh.up?(hh.bad.length?'bad':'up'):null):null;
-  t.append(el('i',dotc(st)),el('b','',meta.title));
-  if(meta.unit)t.append(el('span','chip',meta.host),el('span','chip',SRC[meta.source]||meta.source));
-  else t.append(el('span','chip',meta.host?'cały serwer · '+us.length+' źródeł':D.hosts.size+' serwerów · '+us.length+' źródeł'));
-  show('logs');headStats();reload();
-}
-const matching=()=>!cur?[]:D.units.filter(u=>cur.sel===ALL||(cur.meta.unit?u.sel===cur.sel:u.host===cur.meta.host));
-// zasoby w naglowku logow: kontener Dockera, caly serwer albo stan uslugi
-function resBox(){
-  if(!cur)return;
-  const m=cur.meta,s=m.host?D.stat.get(m.host):null,box=$('#resbox');let lab='',val='';
-  if(s&&m.source==='docker'){const c=s.cmap.get(m.unit);if(c){lab='Kontener';val=c.cpu!=null?'CPU '+pc(fnum(c.cpu))+' · RAM '+String(c.mem||'').split('/')[0].trim():cstate(c)[1]}}
-  else if(s&&!m.unit){lab='Serwer';val='CPU '+pc(s.cpu)+' · RAM '+pc(s.mem)+' · dysk '+(s.disks.length?pc(Math.max(...s.disks.map(d=>d[3]/d[4]*100))):pc(s.disk))}
-  else if(s&&m.source==='journald'&&/\.service$/.test(m.unit)){lab='Usługa';val=ustate({host:m.host,source:'journald',unit:m.unit})[1]}
-  box.hidden=!val;$('#reslbl').textContent=lab;$('#resval').textContent=val;
-}
-async function headStats(){
-  if(!cur)return;
-  const e=sum(matching().map(u=>u.inc||0)),eb=$('#e24');eb.textContent=e;eb.style.color=e?'var(--err)':'';eb.title=num(sum(matching().map(u=>u.e24)))+' linii z błędami w 24 h';
-  resBox();
-  try{
-    const sel=cur.sel,h=await hits(sel+' '+EXCL,Date.now()-60*6e4,6e4);
-    if(!cur||cur.sel!==sel)return;
-    const v=(h[0]?h[0].v:new Array(61).fill(0)).slice(-60),r=sum(v.slice(-6,-1))/5;
-    $('#rate').textContent=r>=10?Math.round(r):r.toFixed(1).replace('.',',');
-    spark($('#rsp'),v,null,6e4);
-  }catch{}
-}
-
-// poziom wiersza: priorytet z journald, potem znacznik w tresci ([Warn], level=error, |WARNING |), na koncu slowa kluczowe
-function level(o,m){
-  const lv=parseInt(o.level,10);
-  if(!isNaN(lv))return lv<=3?'e':lv===4?'w':'';
-  const t=m.match(/(?:^|[\[|"=(])\s*(err|error|fatal|crit|critical|panic|wrn|warn|warning|inf|info|notice|dbg|debug)\b/i);
-  if(t)return /^(err|fat|cri|pan)/i.test(t[1])?'e':/^w/i.test(t[1])?'w':'';
-  return /\b(error|fatal|panic|fail(ed|ure)?|critical)\b/i.test(m)?'e':/\bwarn(ing)?\b/i.test(m)?'w':'';
-}
-function mark(span,text){
-  if(!word){span.textContent=text;return}
-  const low=text.toLowerCase(),w=word.toLowerCase();let i=0,j;
-  while((j=low.indexOf(w,i))>=0){span.append(text.slice(i,j),el('mark','',text.slice(j,j+w.length)));i=j+w.length}
-  span.append(text.slice(i));
-}
-function row(o,multi){
-  const m=o._msg||'',dt=new Date(o._time),d=el('div','r '+level(o,m));
-  d.dataset.t=+dt;
-  const t=el('time','',fmt(dt));t.title=dt.toLocaleString('sv');d.append(t,el('i','lv'));
-  if(multi)d.append(el('b','',(o.host||'')+'/'+short(o.unit)));
-  const s=el('span');mark(s,m);d.append(s);
-  return d;
-}
-const atEnd=()=>log.scrollHeight-log.scrollTop-log.clientHeight<60;
-function toEnd(){log.scrollTop=log.scrollHeight;fresh=0;jump.hidden=true;pos.hidden=true}
-function append(objs,initial){
-  const stick=initial||atEnd(),frag=document.createDocumentFragment(),multi=!cur.meta.unit;let n=0;
-  for(const o of objs){
-    const k=o._time+'|'+o._stream+'|'+o._msg;
-    if(seen.has(k))continue;
-    seen.add(k);frag.append(row(o,multi));n++;
-  }
-  if(n){const e=log.querySelector('.n');if(e)e.remove()}
-  log.append(frag);
-  while(log.childElementCount>MAX)log.firstElementChild.remove();
-  if(seen.size>MAX*2)seen=new Set([...seen].slice(-MAX));
-  if(stick)toEnd();else if(n){fresh+=n;jump.textContent='↓ '+fresh+' nowych';jump.hidden=false}
-  $('#cnt').textContent=log.querySelectorAll('.r').length+' linii';
-}
-async function reload(){
-  if(!cur)return;
-  if(ctl)ctl.abort();
-  ctl=new AbortController();const signal=ctl.signal;
-  log.textContent='';seen=new Set();fresh=0;jump.hidden=true;pos.hidden=true;$('#cnt').textContent='';marks();
-  word=$('#q').value.trim();
-  const lv=$('#lvl').value,rv=$('#range').value;
-  if(rv!=='win'&&cur.win){cur.win=null;const wo=$('#range option[value=win]');if(wo)wo.remove()}
-  if(rv==='day')cur.win=dayWin();
-  const win=cur.win;
-  const q=cur.sel+' '+EXCL+(lv==='e'?' '+ERR:lv==='w'?' ('+ERR+' OR '+WARN+')':'')+(word?' ~'+quote('(?i)'+word.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')):'');
-  try{
-    status('Wczytuję…');
-    const txt=await(await api('query',win?{query:q,start:iso(win[0]),end:iso(win[1]),limit:LIMIT}:{query:q+' _time:'+rv,limit:LIMIT},signal)).text();
-    if(signal.aborted)return;  // w miedzyczasie zmieniono zakres - nie mieszaj wynikow
-    const rows=parseLines(txt).sort((a,b)=>a._time<b._time?-1:a._time>b._time?1:0);
-    if(!rows.length)log.append(el('div','n','Brak logów w wybranym zakresie.'+(live&&!win?' Nowe linie pojawią się tutaj same.':'')));
-    append(rows,true);
-    status(rows.length>=LIMIT?'Pokazano '+LIMIT+' najnowszych linii z zakresu. Zawęź wyszukiwanie, żeby zobaczyć starsze.':'');
-    if(live&&!win){cur.q=q;await tail(q,signal)}
-  }catch(e){if(e.name!=='AbortError'&&me)status('Błąd: '+e.message)}
-}
-// na zywo: strumien z bazy; po zerwaniu (restart centrali, tunel Cloudflare ucinajacy ciche polaczenia)
-// dociagamy brakujace linie z ostatnich minut i laczymy sie ponownie
-let lastData=0;
-async function tail(q,signal){
-  lastData=Date.now();
-  let rd;
-  try{rd=(await api('tail',{query:q},signal)).body.getReader()}
-  catch(e){if(!signal.aborted&&e.name!=='AbortError')again(q,signal,e);return}
-  const dec=new TextDecoder();let buf='';
-  try{
-    for(;;){
-      const {done,value}=await rd.read();
-      if(done)break;
-      lastData=Date.now();
-      buf+=dec.decode(value,{stream:true});
-      const i=buf.lastIndexOf('\n');
-      if(i<0)continue;
-      append(parseLines(buf.slice(0,i)));buf=buf.slice(i+1);
-    }
-  }catch(e){if(signal.aborted||e.name==='AbortError')return;return again(q,signal,e)}
-  if(!signal.aborted)again(q,signal);
-}
-function again(q,signal,e){
-  status('Połączenie na żywo przerwane'+(e?' ('+e.message+')':'')+', łączę ponownie…');
-  setTimeout(async()=>{
-    if(signal.aborted)return;
-    await catchUp(q,signal);
-    if(!signal.aborted){status('');tail(q,signal)}
-  },3000);
-}
-// linie z ostatnich minut, ktorych strumien mogl nie dowiezc (duplikaty odrzuca append)
-async function catchUp(q,signal){
-  try{
-    const rows=parseLines(await(await api('query',{query:q+' _time:5m',limit:500},signal)).text()).sort((a,b)=>a._time<b._time?-1:a._time>b._time?1:0);
-    if(!signal.aborted)append(rows);
-  }catch{}
-}
-let posT;
-log.onscroll=()=>{
-  if(atEnd()){fresh=0;jump.hidden=true;pos.hidden=true;return}
-  const rows=log.children,max=log.scrollHeight-log.clientHeight;
-  if(!rows.length||!rows[0].dataset.t||max<=0)return;
-  let lo=0,hi=rows.length-1;
-  while(lo<hi){const m=(lo+hi)>>1;if(rows[m].offsetTop+rows[m].offsetHeight<=log.scrollTop)lo=m+1;else hi=m}
-  const p=Math.round(log.scrollTop/max*100);
-  pos.children[0].textContent=rel(+rows[lo].dataset.t);pos.querySelector('u i').style.width=p+'%';pos.children[2].textContent=p+'%';
-  pos.hidden=false;clearTimeout(posT);posT=setTimeout(()=>{pos.hidden=true},1500);
-};
-
-// ------------------------------------------------------------------ sterowanie
-for(const b of document.querySelectorAll('#nav button'))b.onclick=()=>{
-  const g=b.dataset.go;
-  if(g==='cron'){cronHost=null;renderCron();show(g);if(Date.now()-I.cronT>6e4)loadCron();return}
-  if(g==='over'||g==='notif'||g==='users'||g==='status'||g==='add')return show(g);
-  pick(ALL,{title:g==='err'?'Błędy i ostrzeżenia':'Wszystkie logi',multi:true},g==='err'?'w':'',g==='err'?'1d':null);
-};
-for(const b of document.querySelectorAll('[data-tog]'))b.onclick=()=>document.body.classList.toggle('nos');
-// telefon: panel jest szuflada; zamyka sie po wybraniu widoku albo zrodla i po kliknieciu obok
-const narrow=()=>innerWidth<760;
-$('#scrim').onclick=()=>document.body.classList.add('nos');
-document.querySelector('aside').addEventListener('click',e=>{if(narrow()&&e.target.closest('#nav button,.it:not(.ghost)'))document.body.classList.add('nos')});
-addEventListener('keydown',e=>{if(e.key==='Escape'&&narrow())document.body.classList.add('nos')});
-// wyglad strony: zapamietany w tej przegladarce
-const THEMES=[['','systemowy'],['dark','ciemny'],['light','jasny'],['glass','Apple ciemny'],['glass-light','Apple jasny']];
-function setTheme(t){
-  if(t)document.documentElement.dataset.theme=t;else delete document.documentElement.dataset.theme;
-  try{t?localStorage.setItem('loghub.theme',t):localStorage.removeItem('loghub.theme')}catch{}
-}
-{const ts=$('#theme');for(const [v,l] of THEMES)ts.append(new Option(l,v));ts.value=document.documentElement.dataset.theme||'';ts.onchange=()=>setTheme(ts.value)}
-$('#f').oninput=filterTree;
-$('#range').onchange=()=>{syncDay();reload()};$('#lvl').onchange=reload;
-// logi z wybranego dnia (opcjonalnie zawezone do godzin); dzisiaj konczy sie na teraz
-const ymd=d=>d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate());
-function syncDay(){
-  const on=$('#range').value==='day';
-  for(const x of ['#day','#dfrom','#dto'])$(x).hidden=!on;
-  if(on){const t=ymd(new Date());$('#day').max=t;if(!$('#day').value)$('#day').value=t}
-}
-function dayWin(){
-  const d=$('#day').value||ymd(new Date()),a=new Date(d+'T'+($('#dfrom').value||'00:00')),b=new Date(d+'T'+($('#dto').value||'23:59'));
-  let from=+a,to=+b+6e4;if(to<=from)to=from+6e4;
-  return [from,Math.min(to,Date.now())];
-}
-for(const x of ['#day','#dfrom','#dto'])$(x).onchange=()=>{if($('#range').value==='day')reload()};
-let deb;$('#q').oninput=()=>{clearTimeout(deb);deb=setTimeout(reload,400)};
-$('#q').onkeydown=e=>{if(e.key==='Escape'){e.target.value='';reload()}};
-$('#live').onclick=()=>{live=!live;$('#live').setAttribute('aria-pressed',live);$('#live span').textContent=live?'Na żywo':'Wstrzymane';reload()};
-jump.onclick=toEnd;
-document.onkeydown=e=>{
-  if(!me)return;
-  if(e.key==='/'&&view==='logs'&&!/INPUT|SELECT/.test(e.target.tagName)){e.preventDefault();$('#q').focus()}
-  if(e.key==='k'&&(e.ctrlKey||e.metaKey)){e.preventDefault();document.body.classList.remove('nos');$('#f').focus()}
-};
-
-if(innerWidth<760)document.body.classList.add('nos');
-async function boot(){
-  try{const {status:s,data:d}=await auth('me');if(s===200&&d.user)return enter(d)}catch{}
-  showLogin('');
-}
-if(!demo()&&new URLSearchParams(location.search).has('demo')){
-  const s=document.createElement('script');s.src='demo.js';s.onload=s.onerror=boot;document.head.append(s);
-}else boot();
-</script>
-</body>
+    <script src="js/util.js"></script>
+    <script src="js/api.js"></script>
+    <script src="js/data.js"></script>
+    <script src="js/events.js"></script>
+    <script src="js/stats.js"></script>
+    <script src="js/sidebar.js"></script>
+    <script src="js/overview.js"></script>
+    <script src="js/users.js"></script>
+    <script src="js/notify.js"></script>
+    <script src="js/add.js"></script>
+    <script src="js/status.js"></script>
+    <script src="js/cron.js"></script>
+    <script src="js/logs.js"></script>
+    <script src="js/app.js"></script>
+  </body>
 </html>

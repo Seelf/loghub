@@ -1,0 +1,142 @@
+/* Zasoby: paski CPU/RAM/dysku, dyski, porty, goscie Proxmoxa, tabela zasobow. */
+.meters {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+}
+.mt {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+.mt .row b {
+  font-size: 15px;
+  font-variant-numeric: tabular-nums;
+  margin-left: auto;
+}
+.mt small {
+  font-size: 11px;
+  color: var(--mut);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.bar {
+  height: 5px;
+  border-radius: 3px;
+  background: var(--line);
+  overflow: hidden;
+}
+.bar i {
+  display: block;
+  height: 100%;
+  background: var(--acc);
+}
+.bar i.w {
+  background: var(--warn);
+}
+.bar i.e {
+  background: var(--err);
+}
+.probs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+.card .chip {
+  white-space: normal;
+  max-width: 100%;
+  line-height: 1.35;
+  padding-top: 2px;
+  padding-bottom: 2px;
+}
+.dlist {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  border-top: 1px solid var(--line);
+  padding-top: 8px;
+}
+.dl {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 56px 132px;
+  gap: 8px;
+  align-items: center;
+  font-size: 12px;
+}
+.dl span:first-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--mono);
+}
+.dl .num {
+  text-align: right;
+  color: var(--mut);
+  white-space: nowrap;
+  font-size: 11px;
+}
+#dtbl,
+#ptbl {
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  background: var(--card);
+  overflow-x: auto;
+  margin-top: 10px;
+}
+#dtbl .tr {
+  grid-template-columns: minmax(120px, 1fr) minmax(160px, 1.6fr) 90px minmax(170px, 1.6fr) minmax(
+      150px,
+      1.3fr
+    );
+  min-width: 800px;
+  cursor: default;
+}
+#ptbl .tr {
+  grid-template-columns: minmax(120px, 1fr) 60px minmax(130px, 1.2fr) 70px minmax(120px, 1.1fr) minmax(
+      160px,
+      1.3fr
+    ) minmax(130px, 1fr);
+  min-width: 900px;
+  cursor: default;
+}
+.guests {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  border-top: 1px solid var(--line);
+  padding-top: 8px;
+}
+.guests > div {
+  display: grid;
+  grid-template-columns: 12px 1fr 52px 96px;
+  gap: 8px;
+  align-items: center;
+  font-size: 12px;
+}
+.guests span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.guests .num {
+  text-align: right;
+}
+#rtbl {
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  background: var(--card);
+  overflow-x: auto;
+  margin-top: 10px;
+}
+#rtbl .tr {
+  grid-template-columns: minmax(160px, 1.6fr) 90px minmax(90px, 1fr) minmax(130px, 1.2fr) minmax(
+      150px,
+      1.4fr
+    ) minmax(140px, 1.4fr);
+  min-width: 820px;
+}
+#rtbl .tr {
+  cursor: default;
+}
