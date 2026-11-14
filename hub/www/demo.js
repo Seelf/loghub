@@ -759,7 +759,6 @@
         name: 'telefon',
         url: 'https://ntfy.sh/moj-loghub',
         token: '',
-        types: ['service_down', 'cron_failed', 'disk_health'],
         targets: [
           { host: 'vps', target: 'teamspeak.service' },
           { host: 'media', target: 'jellyfin' },

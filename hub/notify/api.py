@@ -48,10 +48,6 @@ def clean_config(new, old):
         for f in CHANNEL_FIELDS[t]:
             v = str(ch.get(f) or "").strip()[:500]
             c[f] = prev.get(f, "") if v == MASK else v
-        # typy alertow, ktore ten kanal dostaje; pusta lista = wszystkie (kompatybilne ze starymi instalacjami)
-        # walidacja wobec kanonicznej listy typow (klucze rules w settings.py), nie wobec ustawien uzytkownika
-        ts = ch.get("types")
-        c["types"] = list(dict.fromkeys(k for k in (ts if isinstance(ts, list) else []) if k in DEFAULT["rules"]))
         # konkretne serwery i uslugi; pusta lista = wszystkie, pusty target = caly serwer;
         # nieznanego hosta sie akceptuje (moze zniknac), wpis po prostu nie bedzie pasowac do niczego
         tg, out_tg = ch.get("targets"), []

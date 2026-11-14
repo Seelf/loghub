@@ -1,7 +1,7 @@
 """Wysylka powiadomien: ntfy, Telegram, Discord, webhook, e-mail.
 
-Kazdy kanal moze dostawac tylko wybrane typy alertow (pole 'types'; puste = wszystkie),
-wiadomosc testowa idzie na wszystkie wlaczone kanaly."""
+Kazdy kanal moze dostawac tylko alerty o wybranych serwerach i uslugach (pole 'targets';
+puste = wszystkie); wiadomosc testowa idzie na wszystkie wlaczone kanaly."""
 
 import json
 import smtplib
@@ -81,17 +81,13 @@ def send_channel(ch, what, a):
 def channel_allows(ch, what, a):
     """Czy kanal dostaje dany alert.
 
-    Dwa filtry per kanal, kazdy pusty = wszystko (kompatybilne ze starymi instalacjami):
-    - 'types': typy alertow (klucze rules z settings.py),
-    - 'targets': konkretne serwery i usługi ({host, target}; pusty target = cały serwer);
-      wybrana usługa pasuje też do wysypu błędów i błędów cron z tego samego źródła.
-    Wiadomość testowa idzie na wszystkie włączone kanały.
+    'targets': konkretne serwery i usługi ({host, target}; pusty target = cały serwer);
+    pusta lista = wszystkie (kompatybilne ze starymi instalacjami). Wybrana usługa pasuje
+    też do wysypu błędów i błędów cron z tego samego źródła. Wiadomość testowa idzie na
+    wszystkie włączone kanały.
     """
     if what == "test":
         return True
-    kinds = ch.get("types") or []
-    if kinds and a.get("kind") not in kinds:
-        return False
     ts = ch.get("targets") or []
     if ts:
         h, u = a.get("host") or "", a.get("unit") or ""

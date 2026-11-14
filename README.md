@@ -167,10 +167,10 @@ zadań cron, zapełnienie każdego dysku, awarię dysku (SMART) i pule ZFS poza 
 port nowo otwarty na świat w zaporze ufw (jedno powiadomienie z oknem czasowym zmiany) albo wyłączenie ufw,
 nagły wysyp błędów w logach. Kanały: ntfy, Telegram, Discord,
 webhook, e-mail. Każdy kanał można zawęzić do wybranych serwerów i usług (np. tylko TeamSpeak
-na VPS: powiadomienie idzie, gdy coś dzieje się właśnie z tymi celami) i do wybranych typów alertów —
-bez zaznaczenia = wszystkie. Zadania cron nie są osobnymi celami — pokrywa je wybór
-całego serwera. Wiadomość testowa omija filtry i idzie na wszystkie włączone kanały: sprawdza
-sam kanał, nie filtry. Ustawienia: zakładka Powiadomienia (tylko administrator).
+na VPS: powiadomienie idzie, gdy coś dzieje się właśnie z tymi celami); bez zaznaczenia kanał
+dostaje wszystko. Zadania cron nie są osobnymi celami — pokrywa je wybór całego serwera.
+Wiadomość testowa omija filtr i idzie na wszystkie włączone kanały: sprawdza sam kanał, nie filtr.
+Ustawienia: zakładka Powiadomienia (tylko administrator).
 
 ## Zadania cron
 

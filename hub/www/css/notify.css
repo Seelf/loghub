@@ -138,29 +138,9 @@
 .chn .kinds > small {
   color: var(--mut);
 }
-.chn .kq {
-  display: flex;
-  gap: 6px;
-}
 button.mini {
   font-size: 11px;
   padding: 1px 8px;
-}
-.chn .kgrid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
-  gap: 4px 10px;
-}
-.chn .knd {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  color: var(--fg);
-  font-size: 12px;
-}
-.chn .knd input {
-  margin: 0;
-  flex: none;
 }
 .chn .trows {
   display: flex;
